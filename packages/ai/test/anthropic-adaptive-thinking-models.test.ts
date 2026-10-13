@@ -15,6 +15,8 @@ const EXPECTED_CURRENT_ADAPTIVE_THINKING_MODELS = [
 	"kimi-coding/kimi-for-coding",
 	"kimi-coding/k3",
 	"kimi-coding/kimi-for-coding-highspeed",
+	"minimax-cn/MiniMax-M3.1-Flash-Preview",
+	"minimax/MiniMax-M3.1-Flash-Preview",
 	"opencode/claude-opus-4-8",
 	"opencode/claude-opus-5",
 	"vercel-ai-gateway/anthropic/claude-opus-4.8",
@@ -41,7 +43,7 @@ describe("Anthropic adaptive thinking model metadata", () => {
 					// Regression for #9323: Fireworks uses catalog effort metadata and
 					// verified fallbacks, not a fixed set of adaptive model names.
 					modelId.startsWith("fireworks/") ||
-					/(opus[-.](4[-.][678]|5)|sonnet[-.]4[-.]6|sonnet[-.]5|haiku[-.]5[-.]5|fable[-.]5|kimi-coding\/)/.test(
+					/(opus[-.](4[-.][678]|5)|sonnet[-.]4[-.]6|sonnet[-.]5|haiku[-.]5[-.]5|fable[-.]5|kimi-coding\/|minimax(-cn)?\/MiniMax-M3\.1-Flash-Preview)/.test(
 						modelId,
 					),
 			),

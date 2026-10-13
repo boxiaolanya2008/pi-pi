@@ -44,7 +44,7 @@ For Ollama, LM Studio, vLLM, SGLang, and other compatible servers, [configure a 
 
 ## Configure a compatible endpoint
 
-Use [`models.json`](configuration.md#agent-directory) when an endpoint speaks an API Pi already supports. This includes most Ollama, LM Studio, vLLM, SGLang, and proxy deployments.
+Use [`models.json`](configuration.md#agent-directory) when an endpoint speaks an API Pi already supports. This includes most Ollama, LM Studio, vLLM, SGLang, and proxy deployments. The first-time setup dialog can also create this entry for you.
 
 ```json
 {

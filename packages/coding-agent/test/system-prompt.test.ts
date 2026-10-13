@@ -33,7 +33,7 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			expect(prompt).toContain("Show file paths clearly");
+			expect(prompt).toContain("路径须清晰可查");
 		});
 	});
 
@@ -48,7 +48,7 @@ describe("buildSystemPrompt", () => {
 				skills: [],
 			});
 
-			expect(defaultPrompt.startsWith("You are an expert coding assistant operating inside pi")).toBe(true);
+			expect(defaultPrompt.startsWith("# Role: 轻量主义内容优化专家")).toBe(true);
 			expect(customPrompt.startsWith("You are Exact.\n\n<cwd>")).toBe(true);
 		});
 
@@ -68,7 +68,7 @@ describe("buildSystemPrompt", () => {
 
 			expect(prompt).toContain("<addendum>\nAdditional instructions.\n</addendum>");
 			expect(prompt).toContain(
-				'<project_context>\nProject-specific instructions and guidelines:\n\n<project_instructions path="/tmp/AGENTS.md">',
+				'<project_context>\n项目专属说明与准则：\n\n<project_instructions path="/tmp/AGENTS.md">',
 			);
 			expect(prompt).toContain("<cwd>\n/tmp\n</cwd>");
 		});
@@ -95,8 +95,8 @@ describe("buildSystemPrompt", () => {
 		});
 
 		test.each([
-			[["powershell"], "Use PowerShell for file operations"],
-			[["bash", "powershell"], "Use bash or PowerShell for file operations"],
+			[["powershell"], "列举、搜索、查找文件一律用 PowerShell"],
+			[["bash", "powershell"], "列举、搜索、查找文件一律用 bash 或 PowerShell"],
 		] as const)("uses shell-specific guidance for %j", (selectedTools, expected) => {
 			const prompt = buildSystemPrompt({
 				selectedTools: [...selectedTools],
@@ -115,10 +115,12 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			expect(prompt).toContain(
-				"- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory",
-			);
-			expect(prompt).toContain("environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md)");
+			expect(
+				prompt.includes("docs/... 从") &&
+					prompt.includes("examples/... 从") &&
+					prompt.includes("不要当作当前工作目录下的路径"),
+			).toBe(true);
+			expect(prompt).toContain("环境变量（docs/environment-variables.md）、MCP 服务器（docs/mcp.md）");
 		});
 	});
 

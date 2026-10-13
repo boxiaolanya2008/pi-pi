@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the default system prompt preamble with the lightweight-content-optimization persona (Chinese), and translated the static prompt sections (tools footer, rules, docs guide, project-context header) into Chinese; dynamic per-tool guideline bullets remain in their original language
+
+### Added
+
+- Dedicated `ThinkingBlockComponent` for rendering assistant thinking runs (collapsible header with click-to-toggle, italic reasoning body); replaces the inline thinking rendering in assistant messages
+- First-time setup now offers guided custom model configuration (API base URL, API type, model ID, and API key); the result is saved to `models.json` as the `custom` provider and set as the default model
+- Built-in `expert-team` extension: `/experts <question>` runs independent model conversations for each expert persona in parallel and merges them into a synthesis; `/experts` without arguments browses past transcripts
+- Built-in `plan` extension: `/plan <topic>` drafts a Markdown plan with the current model, saves it under `~/pipi/plan/--工作区example--/`, and creates a TODO list from its checklist only after user confirmation; `/todos` views the list, `/plans` opens saved plans for line-level editing where the model rewrites the selected line (Ctrl+Z reverts)
+- Cold start splash animation in interactive mode (theme-colored wave, non-blocking, stops as soon as the main UI is ready)
+
 ### Fixed
 
 - Pinned internal Pi dependencies to exact release versions to prevent fresh installs from mixing incompatible packages ([#10865](https://github.com/earendil-works/pi/issues/10865))

@@ -166,6 +166,7 @@ import { ScopedModelsSelectorComponent } from "./components/scoped-models-select
 import { SessionSelectorComponent } from "./components/session-selector.ts";
 import { SettingsSelectorComponent } from "./components/settings-selector.ts";
 import { SkillInvocationMessageComponent } from "./components/skill-invocation-message.ts";
+import { SplashAnimation } from "./components/splash.ts";
 import {
 	BranchSummaryStatusIndicator,
 	CompactionStatusIndicator,
@@ -996,6 +997,11 @@ export class InteractiveMode {
 
 		// Start the UI before initializing extensions so session_start handlers can use interactive dialogs
 		this.ui.start();
+		// Splash plays over the managed-tool/extension loading window and is removed
+		// once the editor becomes interactive; it never adds startup latency.
+		const splash = new SplashAnimation(this.ui);
+		this.documentContainer.addChild(splash);
+		splash.start();
 		this.isInitialized = true;
 		this.programStatus.report();
 		this.ensurePngTranscoder();
@@ -1094,6 +1100,8 @@ export class InteractiveMode {
 		// Enable the remaining input handlers only after managed-tool setup completes.
 		this.setupKeyHandlers();
 		this.setupEditorSubmitHandler();
+		splash.stop();
+		this.documentContainer.removeChild(splash);
 		this.ui.requestRender();
 
 		// Initialize extensions first so resources are shown before messages

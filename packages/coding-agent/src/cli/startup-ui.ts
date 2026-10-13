@@ -6,9 +6,18 @@ import {
 	TuiMainScreen,
 } from "@earendil-works/pi-tui";
 import { existsSync } from "fs";
-import { APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR, getAgentDir, getSettingsPath, PACKAGE_NAME } from "../config.ts";
+import {
+	APP_NAME,
+	CONFIG_DIR_NAME,
+	ENV_AGENT_DIR,
+	getAgentDir,
+	getModelsPath,
+	getSettingsPath,
+	PACKAGE_NAME,
+} from "../config.ts";
 import { areExperimentalFeaturesEnabled } from "../core/experimental.ts";
 import { KeybindingsManager } from "../core/keybindings.ts";
+import { CUSTOM_PROVIDER_ID, upsertCustomProvider } from "../core/models-json-write.ts";
 import { DefaultPackageManager, type ResolvedResource } from "../core/package-manager.ts";
 import { SettingsManager } from "../core/settings-manager.ts";
 import { ExtensionInputComponent } from "../modes/interactive/components/extension-input.ts";
@@ -192,6 +201,19 @@ export async function showFirstTimeSetup(settingsManager: SettingsManager): Prom
 				settingsManager.setTheme(result.theme);
 				settingsManager.setEnableAnalytics(result.shareAnalytics);
 				await settingsManager.flush();
+				if (result.customModel) {
+					try {
+						upsertCustomProvider(getModelsPath(), {
+							providerId: CUSTOM_PROVIDER_ID,
+							...result.customModel,
+						});
+						settingsManager.setDefaultModelAndProvider(CUSTOM_PROVIDER_ID, result.customModel.modelId);
+					} catch (error) {
+						console.error(
+							`Failed to save custom model config: ${error instanceof Error ? error.message : error}`,
+						);
+					}
+				}
 			}
 			await clearStartupTui(ui);
 			ui.stop();

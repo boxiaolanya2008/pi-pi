@@ -2323,26 +2323,43 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 		] as const;
 
 		for (const { key, provider, baseUrl } of minimaxVariants) {
-			if (data[key]?.models) {
-				for (const [modelId, model] of Object.entries(data[key].models)) {
-					const m = model as ModelsDevModel;
-					if (m.tool_call !== true) continue;
-
-					models.push({
-						id: modelId,
-						name: m.name || modelId,
-						api: "anthropic-messages",
-						provider,
-						// MiniMax's Anthropic-compatible API - SDK appends /v1/messages
-						baseUrl,
-						reasoning: m.reasoning === true,
-						input: m.modalities?.input?.includes("image") ? ["text", "image"] : ["text"],
-						cost: getModelsDevCost(m.cost),
-						contextWindow: m.limit?.context || 4096,
-						maxTokens: m.limit?.output || 4096,
-					});
-					recordModelsDevReasoningOptions(provider, modelId, m);
-				}
+			const directModels = data[key]?.models ?? {};
+			// M3.1-Flash-Preview ships only under the coding-plan providers in models.dev;
+			// reuse that catalog entry for the direct API providers.
+			const planKey = provider === "minimax" ? "minimax-coding-plan" : "minimax-cn-coding-plan";
+			const planModels = data[planKey]?.models ?? {};
+			const PLAN_ONLY_PREVIEW_ID = "MiniMax-M3.1-Flash-Preview";
+			const modelIds = Object.keys(directModels);
+			if (planModels[PLAN_ONLY_PREVIEW_ID] && !directModels[PLAN_ONLY_PREVIEW_ID]) {
+				modelIds.push(PLAN_ONLY_PREVIEW_ID);
+			}
+			for (const modelId of modelIds) {
+				const m = (directModels[modelId] ?? planModels[modelId]) as ModelsDevModel;
+				if (m.tool_call !== true) continue;
+				const effortMap = getEffortThinkingLevelMap(m.reasoning_options ?? []);
+				models.push({
+					id: modelId,
+					name: m.name || modelId,
+					api: "anthropic-messages",
+					provider,
+					// MiniMax's Anthropic-compatible API - SDK appends /v1/messages
+					baseUrl,
+					...(modelId === PLAN_ONLY_PREVIEW_ID
+						? // M3.1-Flash-Preview requires adaptive thinking (budget/disabled thinking returns 400)
+							{ compat: { forceAdaptiveThinking: true } }
+						: {}),
+					...(m.reasoning === true
+						? // Effort-ladder models get their verified map; toggle-only models still
+							// get the xhigh/max rungs surfaced (budget-based thinking clamps them).
+							{ thinkingLevelMap: effortMap ?? { xhigh: "xhigh", max: "max" } }
+						: {}),
+					reasoning: m.reasoning === true,
+					input: m.modalities?.input?.includes("image") ? ["text", "image"] : ["text"],
+					cost: getModelsDevCost(m.cost),
+					contextWindow: m.limit?.context || 4096,
+					maxTokens: m.limit?.output || 4096,
+				});
+				recordModelsDevReasoningOptions(provider, modelId, m);
 			}
 		}
 
@@ -3093,7 +3110,12 @@ async function generateModels() {
 		}
 	}
 
-	const minimaxDirectSupportedIds = new Set(["MiniMax-M2.7", "MiniMax-M2.7-highspeed", "MiniMax-M3"]);
+	const minimaxDirectSupportedIds = new Set([
+		"MiniMax-M2.7",
+		"MiniMax-M2.7-highspeed",
+		"MiniMax-M3",
+		"MiniMax-M3.1-Flash-Preview",
+	]);
 
 	for (let i = allModels.length - 1; i >= 0; i--) {
 		const candidate = allModels[i];

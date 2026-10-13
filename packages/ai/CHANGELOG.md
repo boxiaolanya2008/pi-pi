@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `MiniMax-M3.1-Flash-Preview` to the direct `minimax` and `minimax-cn` providers (from the coding-plan catalog entries): adaptive thinking via `output_config.effort` with the verified `low`–`max` effort ladder, 1M context
+- Surfaced the `xhigh` and `max` thinking levels for MiniMax reasoning models; M3.1-Flash-Preview also exposes them as native effort rungs
+
 ### Fixed
 
 - Fixed tool-call argument parsing dropping fields when a string contains an invalid `\u` escape such as `\usepackage` ([#10868](https://github.com/earendil-works/pi/issues/10868))
