@@ -8,6 +8,7 @@
 
 ### Added
 
+- Built-in `reverie` memory extension: the model's accumulated user profile lives in a single append-only `~/pipi/reverie.md`; the snapshot is injected once per session as a static system prompt section (prompt-prefix caching is never invalidated), and a standing reminder makes the model call the new `reverie` tool after each turn to append one sentence about the user
 - Dedicated `ThinkingBlockComponent` for rendering assistant thinking runs (collapsible header with click-to-toggle, italic reasoning body); replaces the inline thinking rendering in assistant messages
 - First-time setup now offers guided custom model configuration (API base URL, API type, model ID, and API key); the result is saved to `models.json` as the `custom` provider and set as the default model
 - Built-in `expert-team` extension: `/experts <question>` runs independent model conversations for each expert persona in parallel and merges them into a synthesis; `/experts` without arguments browses past transcripts
