@@ -1,0 +1,7 @@
+# 打包产物由 npm run 构建流程拷贝生成，不入库
+dist/
+docs/
+examples/
+schemas/
+containerization.md
+CHANGELOG.md

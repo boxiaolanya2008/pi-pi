@@ -1,0 +1,34 @@
+{
+	"name": "@boxiaolanya2008/pi-pi",
+	"version": "1.2.0",
+	"description": "Pi-Pi: a feature fork of the Pi coding agent (guided model setup, expert team, plan mode, reverie memory, cold-start splash, MiniMax M3.1-Flash)",
+	"type": "module",
+	"bin": {
+		"pipi": "dist/bundle/cli.js",
+		"pi-pi": "dist/bundle/cli.js"
+	},
+	"files": [
+		"dist",
+		"docs",
+		"examples",
+		"schemas",
+		"CHANGELOG.md"
+	],
+	"engines": {
+		"node": ">=22.19.0"
+	},
+	"keywords": [
+		"pi",
+		"coding-agent",
+		"agent",
+		"cli",
+		"llm"
+	],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/boxiaolanya2008/pi-pi.git"
+	},
+	"homepage": "https://github.com/boxiaolanya2008/pi-pi#readme",
+	"bugs": "https://github.com/boxiaolanya2008/pi-pi/issues"
+}
