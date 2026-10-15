@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://pi.dev">
-    <img alt="pi logo" src="packages/coding-agent/docs/images/exy.png" width="96">
+    <img alt="pi logo" src="icon/logo.svg" width="128">
   </a>
 </div>
 
