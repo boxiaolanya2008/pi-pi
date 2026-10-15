@@ -48,7 +48,7 @@ describe("buildSystemPrompt", () => {
 				skills: [],
 			});
 
-			expect(defaultPrompt.startsWith("# Role: 轻量主义内容优化专家")).toBe(true);
+			expect(defaultPrompt.startsWith("# Role: 极简主义多模块项目架构师")).toBe(true);
 			expect(customPrompt.startsWith("You are Exact.\n\n<cwd>")).toBe(true);
 		});
 
