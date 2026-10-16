@@ -6,11 +6,18 @@ English: [project README](https://github.com/boxiaolanya2008/pi-pi#readme)
 
 ## 安装
 
+本包不发布到 npm registry，从克隆下来的仓库安装：
+
 ```bash
-npm install -g @boxiaolanya2008/pi-pi
+npm install --ignore-scripts
+npm run install:local
 ```
 
+Windows 上直接运行仓库根目录的 `install.bat`。加 `--no-build` 可跳过重新构建，只重装现有产物。
+
 需要 Node.js ≥ 22.19。
+
+安装得到的是构建产物的快照，改动源码后需要重新运行一次。整个 agent 已打包为无依赖的自包含产物，安装过程不会从 registry 拉取任何内容。
 
 ## 使用
 

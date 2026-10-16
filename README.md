@@ -21,15 +21,22 @@ Pi-Pi is a lightweight fork of the Pi coding agent. It keeps Pi's minimal, exten
 
 ## Install
 
-```bash
-npm install -g @boxiaolanya2008/pi-pi
-```
-
-Requires Node.js 22.19+. On Windows you can also run [install.bat](install.bat). Or from source:
+This package is not published to a registry. Install it from a clone:
 
 ```bash
 npm install --ignore-scripts
-npm run build
+npm run install:local      # build, refresh npm-package/, then install globally
+```
+
+On Windows, run [install.bat](install.bat) instead. Add `--no-build` to reinstall the existing build without rebuilding, or run `install.bat --no-build` for the same on Windows.
+
+Requires Node.js 22.19+.
+
+The install is a snapshot of the built sources, so run it again after changing the code. Nothing is fetched from a registry: the agent is bundled into a self-contained package with no dependencies.
+
+To run without installing:
+
+```bash
 ./pi-test.sh        # run from sources (Windows: pi-test.ps1)
 ```
 
