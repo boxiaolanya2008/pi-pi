@@ -46,5 +46,5 @@ export function upsertCustomProvider(modelsPath: string, config: CustomModelConf
 	parsed.providers = providers;
 
 	mkdirSync(dirname(modelsPath), { recursive: true });
-	writeFileSync(modelsPath, JSON.stringify(parsed, null, "\t") + "\n");
+	writeFileSync(modelsPath, `${JSON.stringify(parsed, null, "\t")}\n`);
 }

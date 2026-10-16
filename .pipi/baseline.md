@@ -53,7 +53,7 @@
 
 1. 首次运行（`PI_EXPERIMENTAL=1` 且无 settings.json）→ 引导对话框出现 theme → analytics → model 配置；完成后 `~/.pi/models.json` 出现 `custom` provider，settings.json 出现 defaultProvider/defaultModel，重启后 `/model` 可见并默认选中。
 2. `/experts <问题>` → 状态栏出现 "experts consulting..." → 会话内出现分专家回答 + Synthesis；`/experts` 可回看历史。
-3. `/plan <主题>` → 计划 MD 落盘 `~/pipi/plan/--工作区example--/` → 确认前无 TODO → 确认后编辑器下方出现 todo widget；`/todos` 打开列表。
+3. `/plan <主题>` → 进入计划模式（edit/write 被禁用）→ 模型探索后调用 save_plan → MD 落盘 `%APPDATA%/.pipi/plan/--工作区example--/` → 模型调用 plan_mode exit 恢复写权限；`/todos` 打开列表。
 4. `/plans` → 选文档 → ↑↓ 选行 → Enter 输入修改要求 → 该行被模型重写并写回文件；Ctrl+Z 回退。
 5. 启动时 fd/rg 下载与扩展加载窗口出现主题色波浪动画，编辑器可用即消失。
 

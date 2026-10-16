@@ -35,7 +35,7 @@ describe("reverie memory file", () => {
 
 	test("snapshot injection caps to the file tail", () => {
 		expect(snapshotForPrompt("abc")).toBe("abc");
-		const long = "x".repeat(5000) + "tail-marker";
+		const long = `${"x".repeat(5000)}tail-marker`;
 		expect(snapshotForPrompt(long)).toBe(long.slice(-4000));
 	});
 });

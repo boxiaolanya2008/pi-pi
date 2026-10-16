@@ -1,20 +1,21 @@
 /**
  * Reverie memory extension.
  *
- * Maintains a single append-only user-profile file at `~/pipi/reverie.md`. The
- * file is injected once per session as a system prompt section (static for the
- * whole session, so prompt-prefix caching is never invalidated), together with
- * a standing reminder that makes the model call the `reverie` tool after each
+ * Maintains a single append-only user-profile file at
+ * `%APPDATA%/.pipi/reverie.md` (XDG config dir on non-Windows). The file is
+ * injected once per session as a system prompt section (static for the whole
+ * session, so prompt-prefix caching is never invalidated), together with a
+ * standing reminder that makes the model call the `reverie` tool after each
  * turn to append what it learned about the user. Updated snapshots load with
  * the next session.
  */
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
+import { REVERIE_PATH } from "../storage-paths.ts";
 
 const ReverieParams = Type.Object({
 	description: Type.String({
@@ -22,8 +23,6 @@ const ReverieParams = Type.Object({
 	}),
 });
 
-const REVERIE_DIR = join(homedir(), "pipi");
-export const REVERIE_PATH = join(REVERIE_DIR, "reverie.md");
 const REVERIE_HEADER = "# Reverie — 用户记忆\n";
 /** Injection cap: only the tail of the file goes into the prompt. */
 const SNAPSHOT_TAIL_CHARS = 4000;
@@ -32,7 +31,6 @@ const SECTION_NAME = "reverie";
 /** Ensure the file exists (creating dir and file on first use) and return its content. */
 export function readOrCreateReverie(path: string = REVERIE_PATH): string {
 	if (!existsSync(path)) {
-		mkdirSync(REVERIE_DIR, { recursive: true });
 		writeFileHeader(path);
 		return REVERIE_HEADER;
 	}
@@ -62,7 +60,7 @@ export function snapshotForPrompt(content: string): string {
 function buildSectionContent(snapshot: string): string {
 	return `## 用户记忆（reverie）
 
-下面是历史对话中积累的用户画像（~/pipi/reverie.md），用于理解用户是什么样的人、偏好什么、如何交流：
+下面是历史对话中积累的用户画像（%APPDATA%/.pipi/reverie.md），用于理解用户是什么样的人、偏好什么、如何交流：
 
 ${snapshot}
 
@@ -98,7 +96,7 @@ export default function reverieExtension(pi: ExtensionAPI): void {
 		name: "reverie",
 		label: "Reverie",
 		description:
-			"Append a one-sentence description of the user (identity, preference, habit, goal, or communication style observed in this conversation) to ~/pipi/reverie.md",
+			"Append a one-sentence description of the user (identity, preference, habit, goal, or communication style observed in this conversation) to %APPDATA%/.pipi/reverie.md",
 		parameters: ReverieParams,
 		async execute(_toolCallId, params) {
 			appendUserDescription(params.description);

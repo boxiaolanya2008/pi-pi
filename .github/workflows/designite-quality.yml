@@ -1,0 +1,50 @@
+name: Designite Incremental Code Quality Analysis
+
+# Designite itself only analyzes C#/.NET and Java, not TypeScript. This
+# workflow keeps the same intent (incremental design/quality smells on every
+# PR) using the repo's own toolchain: Biome on changed files only, plus the
+# whole-program type check with a warm tsbuildinfo cache.
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: designite-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  incremental-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Collect changed TypeScript files
+        id: changed
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          FILES=$(git diff --name-only "$BASE"...HEAD -- 'packages/*/src/**/*.ts' 'packages/*/test/**/*.ts' | tr '\n' ' ')
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+          echo "Changed files: $FILES"
+
+      - name: Incremental Biome analysis (changed files only)
+        if: steps.changed.outputs.files != ''
+        run: npx @biomejs/biome check ${{ steps.changed.outputs.files }}
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Verify module boundaries
+        run: npm run check:runtime-deps && npm run check:ts-imports && npm run check:entry-graphs

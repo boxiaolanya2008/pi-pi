@@ -1,12 +1,15 @@
 /**
  * Plan mode extension.
  *
- * `/plan <topic>` drafts a Markdown plan with the current model, saves it under
- * `~/pipi/plan/--工作区example--/`, and — only after the user confirms — creates a
- * TODO list from the plan's checklist items. TODO state lives in tool results and
- * custom entries on the session branch, so branching restores the right state.
+ * The model switches between plan mode and agent mode by itself through the
+ * `plan_mode` tool: entering disables write tools for read-only exploration and
+ * design; `save_plan` persists the designed Markdown document under
+ * `%APPDATA%/.pipi/plan/<workspace>/`; exiting restores full tool access to
+ * implement. `/plan <topic>` is a shortcut that enters plan mode and hands the
+ * topic to the model; `/plan` without arguments toggles the mode.
  *
- * The `todo` tool lets the model manage the same list; `/todos` opens the viewer.
+ * Mode and TODO state live in custom entries / tool results on the session
+ * branch, so branching restores the right state. `/todos` opens the todo viewer.
  */
 
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,7 +18,8 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
-import { planDir, savePlanDoc } from "./plan-doc.ts";
+import { PLAN_DIR } from "../storage-paths.ts";
+import { savePlanDoc } from "./plan-doc.ts";
 import { PlanLineEditor, TodoListComponent } from "./viewer.ts";
 
 interface Todo {
@@ -38,12 +42,14 @@ const TodoParams = Type.Object({
 });
 
 const TODO_ENTRY_TYPE = "plan-todos";
-const PLAN_RESULT_TYPE = "plan-mode-result";
+const PLAN_MODE_ENTRY_TYPE = "plan-mode";
+const PLAN_READONLY_TOOLS = ["read", "bash", "grep", "find", "ls"];
 
-const PLAN_DRAFT_SYSTEM_PROMPT = `You draft implementation plans. Output ONLY a Markdown document:
-a one-line title, a short goal paragraph, then a "## Steps" section with an unchecked
-Markdown checklist item per step ("- [ ] Step description"). Steps are concrete and ordered.
-No extra sections, no prose after the checklist. Answer in the language of the topic.`;
+const PLAN_MODE_ENTER_GUIDANCE = `You are now in plan mode: write tools are disabled so nothing can be modified.
+1. Explore the relevant code read-only until you understand the change.
+2. Design the plan and call save_plan with the full Markdown document
+   (title, goal paragraph, ordered "- [ ]" step checklist).
+3. Call plan_mode with action "exit" to restore write access and implement.`;
 
 export default function planExtension(pi: ExtensionAPI): void {
 	let todos: Todo[] = [];
@@ -73,6 +79,54 @@ export default function planExtension(pi: ExtensionAPI): void {
 		}
 	};
 
+	/** Re-apply plan mode from the last persisted mode entry (resume/branch switch). */
+	const restorePlanMode = (ctx: ExtensionContext) => {
+		let enabled = false;
+		let tools: string[] | undefined;
+		for (const entry of ctx.sessionManager.getBranch()) {
+			if (entry.type !== "custom" || (entry as { customType?: string }).customType !== PLAN_MODE_ENTRY_TYPE)
+				continue;
+			const data = (entry as { data?: { enabled?: boolean; toolsBeforePlanMode?: string[] } }).data;
+			enabled = data?.enabled ?? false;
+			tools = data?.toolsBeforePlanMode;
+		}
+		if (enabled && !planModeEnabled) {
+			toolsBeforePlanMode = tools;
+			const active = new Set((tools ?? pi.getActiveTools()).filter((name) => name !== "edit" && name !== "write"));
+			for (const name of PLAN_READONLY_TOOLS) active.add(name);
+			active.add("save_plan");
+			pi.setActiveTools([...active]);
+			planModeEnabled = true;
+			ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("warning", "plan"));
+		} else if (!enabled && planModeEnabled) {
+			exitPlanMode(ctx);
+		}
+	};
+
+	let planModeEnabled = false;
+	let toolsBeforePlanMode: string[] | undefined;
+
+	function enterPlanMode(ctx: ExtensionContext): void {
+		if (planModeEnabled) return;
+		toolsBeforePlanMode = pi.getActiveTools();
+		const active = new Set(toolsBeforePlanMode.filter((name) => name !== "edit" && name !== "write"));
+		for (const name of PLAN_READONLY_TOOLS) active.add(name);
+		active.add("save_plan");
+		pi.setActiveTools([...active]);
+		planModeEnabled = true;
+		pi.appendEntry(PLAN_MODE_ENTRY_TYPE, { enabled: true, toolsBeforePlanMode });
+		ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("warning", "plan"));
+	}
+
+	function exitPlanMode(ctx: ExtensionContext): void {
+		if (!planModeEnabled) return;
+		pi.setActiveTools(toolsBeforePlanMode ?? pi.getActiveTools());
+		toolsBeforePlanMode = undefined;
+		planModeEnabled = false;
+		pi.appendEntry(PLAN_MODE_ENTRY_TYPE, { enabled: false });
+		ctx.ui.setStatus("plan-mode", undefined);
+	}
+
 	function updateWidgets(ctx: ExtensionContext): void {
 		const th = ctx.ui.theme;
 		if (todos.length > 0) {
@@ -94,10 +148,12 @@ export default function planExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (_event, ctx) => {
 		reconstructState(ctx);
+		restorePlanMode(ctx);
 		updateWidgets(ctx);
 	});
 	pi.on("session_tree", async (_event, ctx) => {
 		reconstructState(ctx);
+		restorePlanMode(ctx);
 		updateWidgets(ctx);
 	});
 
@@ -226,6 +282,74 @@ export default function planExtension(pi: ExtensionAPI): void {
 		},
 	});
 
+	// Model-facing mode switch: the model enters/exits plan mode by itself.
+	pi.registerTool({
+		name: "plan_mode",
+		label: "Plan Mode",
+		description:
+			"Toggle plan mode. enter: read-only exploration mode for designing a plan (write tools disabled; call save_plan to persist the plan document). exit: restore full tool access to implement. Switch by yourself when moving between designing and implementing.",
+		parameters: Type.Object({
+			action: StringEnum(["enter", "exit"] as const),
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+			if (params.action === "enter") {
+				enterPlanMode(ctx);
+				return { content: [{ type: "text", text: PLAN_MODE_ENTER_GUIDANCE }], details: {} };
+			}
+			exitPlanMode(ctx);
+			return {
+				content: [{ type: "text", text: "Plan mode off. Write access restored; implement the plan now." }],
+				details: {},
+			};
+		},
+		renderCall(args, theme) {
+			return new Text(theme.fg("toolTitle", theme.bold("plan_mode ")) + theme.fg("muted", args.action), 0, 0);
+		},
+		renderResult(result, _options, theme) {
+			const text = result.content[0];
+			return new Text(theme.fg("muted", text?.type === "text" ? text.text : ""), 0, 0);
+		},
+	});
+
+	// Model-facing plan document writer.
+	pi.registerTool({
+		name: "save_plan",
+		label: "Save Plan",
+		description:
+			"Save a Markdown plan document to the plan directory and return its path. Use while in plan mode once the design is settled.",
+		parameters: Type.Object({
+			markdown: Type.String({ description: "Full Markdown plan document" }),
+			topic: Type.Optional(Type.String({ description: "Short topic used for the file name" })),
+		}),
+		async execute(_toolCallId, params) {
+			const heading = params.markdown.match(/^#\s+(.+)$/m)?.[1];
+			const topic = params.topic?.trim() || heading?.trim() || "plan";
+			try {
+				const path = savePlanDoc(topic, params.markdown);
+				return {
+					content: [
+						{ type: "text", text: `Saved plan to ${path}. Call plan_mode with action "exit" to implement it.` },
+					],
+					details: { path } as { path?: string },
+				};
+			} catch (error) {
+				return {
+					content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+					details: {},
+					isError: true,
+				};
+			}
+		},
+		renderCall(args, theme) {
+			const shown = String(args.topic ?? args.markdown ?? "").slice(0, 60);
+			return new Text(theme.fg("toolTitle", theme.bold("save_plan ")) + theme.fg("muted", shown), 0, 0);
+		},
+		renderResult(result, _options, theme) {
+			const text = result.content[0];
+			return new Text(theme.fg("muted", text?.type === "text" ? text.text : ""), 0, 0);
+		},
+	});
+
 	// User-facing viewers.
 	pi.registerCommand("todos", {
 		description: "Show all todos on the current branch",
@@ -239,11 +363,12 @@ export default function planExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.registerCommand("plan", {
-		description: "Draft a plan document and optionally create todos from it",
+		description: "Enter plan mode and hand the topic to the model (no args: toggle plan mode)",
 		handler: async (args, ctx) => {
 			const topic = args.trim();
 			if (!topic) {
-				ctx.ui.notify("Usage: /plan <topic>", "info");
+				if (planModeEnabled) exitPlanMode(ctx);
+				else enterPlanMode(ctx);
 				return;
 			}
 			if (!ctx.model) {
@@ -254,53 +379,16 @@ export default function planExtension(pi: ExtensionAPI): void {
 				ctx.ui.notify("Wait for the current run to finish before planning.", "error");
 				return;
 			}
-
-			ctx.ui.setStatus("plan", ctx.ui.theme.fg("accent", "drafting plan..."));
-			let markdown: string;
-			try {
-				const stream = ctx.modelRegistry.streamSimple(
-					ctx.model,
-					{
-						systemPrompt: PLAN_DRAFT_SYSTEM_PROMPT,
-						messages: [{ role: "user", content: topic, timestamp: Date.now() }],
-					},
-					{ signal: ctx.signal },
-				);
-				const message = await stream.result();
-				markdown = message.content
-					.filter((c) => c.type === "text")
-					.map((c) => c.text)
-					.join("\n")
-					.trim();
-			} catch (error) {
-				ctx.ui.setStatus("plan", undefined);
-				ctx.ui.notify(`Plan draft failed: ${error instanceof Error ? error.message : String(error)}`, "error");
-				return;
-			}
-			ctx.ui.setStatus("plan", undefined);
-			if (!markdown) {
-				ctx.ui.notify("The model returned an empty plan.", "error");
-				return;
-			}
-
-			let docPath: string;
-			try {
-				docPath = savePlanDoc(topic, markdown);
-			} catch (error) {
-				ctx.ui.notify(
-					`Failed to save plan document: ${error instanceof Error ? error.message : String(error)}`,
-					"error",
-				);
-				return;
-			}
-
+			enterPlanMode(ctx);
 			pi.sendMessage(
 				{
-					customType: PLAN_RESULT_TYPE,
-					content: `## Plan: ${topic}\n\n${markdown}\n\nSaved to \`${docPath}\``,
+					customType: "plan-mode-request",
+					content: `Design an implementation plan for: ${topic}
+
+${PLAN_MODE_ENTER_GUIDANCE}`,
 					display: true,
 				},
-				{ triggerTurn: false },
+				{ triggerTurn: true },
 			);
 		},
 	});
@@ -312,7 +400,7 @@ export default function planExtension(pi: ExtensionAPI): void {
 				ctx.ui.notify("/plans requires interactive mode", "error");
 				return;
 			}
-			const dir = planDir();
+			const dir = PLAN_DIR;
 			let files: string[] = [];
 			try {
 				files = readdirSync(dir)

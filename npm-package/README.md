@@ -27,8 +27,8 @@ pipi
 
 - 首次引导可直接配置自定义 API / 模型 / Key（写入 models.json）
 - `/experts`：专家团——多专家独立会话并行作答并汇总
-- `/plan`、`/plans`、`/todos`：计划文档落盘 + 确认生成 TODO + 行级模型改写
-- `reverie` 记忆：`~/pipi/reverie.md` 单文件累积用户画像，随系统提示词注入（缓存安全）
+- `/plan`、`/plans`、`/todos`：计划/执行模式由模型自行无缝切换 + 计划文档落盘 + 行级模型改写
+- `reverie` 记忆：`%APPDATA%/.pipi/reverie.md` 单文件累积用户画像，随系统提示词注入（缓存安全）
 - 冷启动波浪动画
 - 默认系统提示词人设与静态段中文化
 - MiniMax-M3.1-Flash-Preview（国际站/国内站直连，adaptive thinking 五档 effort）；MiniMax 模型开放 `xhigh`/`max` 思考等级

@@ -8,11 +8,11 @@
 
 ### Added
 
-- Built-in `reverie` memory extension: the model's accumulated user profile lives in a single append-only `~/pipi/reverie.md`; the snapshot is injected once per session as a static system prompt section (prompt-prefix caching is never invalidated), and a standing reminder makes the model call the new `reverie` tool after each turn to append one sentence about the user
+- Built-in `reverie` memory extension: the model's accumulated user profile lives in a single append-only `%APPDATA%/.pipi/reverie.md` (XDG config dir on non-Windows); the snapshot is injected once per session as a static system prompt section (prompt-prefix caching is never invalidated), and a standing reminder makes the model call the new `reverie` tool after each turn to append one sentence about the user
 - Dedicated `ThinkingBlockComponent` for rendering assistant thinking runs (collapsible header with click-to-toggle, italic reasoning body); replaces the inline thinking rendering in assistant messages
 - First-time setup now offers guided custom model configuration (API base URL, API type, model ID, and API key); the result is saved to `models.json` as the `custom` provider and set as the default model
 - Built-in `expert-team` extension: `/experts <question>` runs independent model conversations for each expert persona in parallel and merges them into a synthesis; `/experts` without arguments browses past transcripts
-- Built-in `plan` extension: `/plan <topic>` drafts a Markdown plan with the current model, saves it under `~/pipi/plan/--工作区example--/`, and creates a TODO list from its checklist only after user confirmation; `/todos` views the list, `/plans` opens saved plans for line-level editing where the model rewrites the selected line (Ctrl+Z reverts)
+- Built-in `plan` extension: the model switches between plan mode and agent mode by itself via the `plan_mode` tool (enter disables write tools for read-only design; `save_plan` persists the Markdown plan under `%APPDATA%/.pipi/plan/--工作区example--/`; exit restores full tool access to implement). `/plan <topic>` enters plan mode and hands the topic to the model, `/plan` toggles the mode, `/todos` views the list, and `/plans` opens saved plans for line-level editing where the model rewrites the selected line (Ctrl+Z reverts)
 - Cold start splash animation in interactive mode (theme-colored wave, non-blocking, stops as soon as the main UI is ready)
 
 ### Fixed
