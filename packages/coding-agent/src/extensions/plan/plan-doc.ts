@@ -1,9 +1,8 @@
 /**
  * Plan document storage.
  *
- * Plan documents are saved as Markdown under `%APPDATA%/.pipi/plan/<workspace>/`
- * (XDG config dir on non-Windows). The workspace directory is currently the
- * literal placeholder `--工作区example--` (replaced when workspace mapping lands).
+ * Plan documents are saved as Markdown under `%APPDATA%/.pipi/plan/`
+ * (XDG config dir on non-Windows).
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";

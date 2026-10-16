@@ -18,9 +18,5 @@ export const PIPI_DIR = join(appDataDir(), ".pipi");
 /** Single append-only user-profile file. */
 export const REVERIE_PATH = join(PIPI_DIR, "reverie.md");
 
-/**
- * Plan documents directory. The workspace segment is the literal placeholder
- * `--工作区example--` (replaced when workspace mapping lands).
- */
-export const PLAN_WORKSPACE_DIR = "--工作区example--";
-export const PLAN_DIR = join(PIPI_DIR, "plan", PLAN_WORKSPACE_DIR);
+/** Plan documents directory. */
+export const PLAN_DIR = join(PIPI_DIR, "plan");
