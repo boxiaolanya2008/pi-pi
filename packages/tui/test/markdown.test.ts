@@ -1729,6 +1729,30 @@ bar`,
 		});
 	});
 
+	describe("Code fence info strings", () => {
+		it("prints only the language and drops fence metadata", () => {
+			const cases = [
+				{ input: "```ts\nconst x = 1;\n```", expected: ["```ts", "  const x = 1;", "```"] },
+				{
+					input: '```ts title="src/a.ts"\nconst x = 1;\n```',
+					expected: ["```ts", "  const x = 1;", "```"],
+				},
+				{
+					input: "```python showLineNumbers\nprint(1)\n```",
+					expected: ["```python", "  print(1)", "```"],
+				},
+				{ input: "```\nplain\n```", expected: ["```", "  plain", "```"] },
+			];
+
+			for (const { input, expected } of cases) {
+				const markdown = new Markdown(input, 0, 0, defaultMarkdownTheme);
+				const lines = markdown.render(80).map((line) => stripAnsi(line).trimEnd());
+
+				assert.deepStrictEqual(lines, expected, `Failed for ${JSON.stringify(input)}`);
+			}
+		});
+	});
+
 	describe("Streaming code fences", () => {
 		it("stabilizes partial closing fence rendering", () => {
 			const cases = [

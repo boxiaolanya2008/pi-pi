@@ -529,9 +529,12 @@ export class Markdown implements Component {
 
 			case "code": {
 				const indent = this.theme.codeBlockIndent ?? "  ";
-				lines.push(this.theme.codeBlockBorder(`\`\`\`${token.lang || ""}`));
+				// The fence info string is the language followed by arbitrary metadata (```ts title="x").
+				// Only the language selects highlighting, so drop the rest instead of printing it in the border.
+				const lang = token.lang?.trim().split(/\s+/)[0] ?? "";
+				lines.push(this.theme.codeBlockBorder(`\`\`\`${lang}`));
 				if (this.theme.highlightCode) {
-					const highlightedLines = this.theme.highlightCode(token.text, token.lang);
+					const highlightedLines = this.theme.highlightCode(token.text, lang || undefined);
 					for (const hlLine of highlightedLines) {
 						lines.push(`${indent}${hlLine}`);
 					}

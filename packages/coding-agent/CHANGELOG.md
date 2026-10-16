@@ -5,15 +5,18 @@
 ### Changed
 
 - Replaced the default system prompt preamble with the minimalist multi-module architect persona (Chinese, verbatim product spec), and translated the static prompt sections (tools footer, rules, docs guide, project-context header) into Chinese; dynamic per-tool guideline bullets remain in their original language
+- `grep` is now enabled by default alongside `read`, `bash`, `edit`, and `write`, so the model can search file contents without a failed tool call first
+- On Windows without Git Bash, the `bash` tool now falls back to PowerShell instead of failing on every call, and the tool description tells the model which command syntax to use so its first command succeeds. Install Git for Windows or set `shellPath` to restore POSIX commands
 
 ### Added
 
+- Cold start splash animation in interactive mode (theme-colored wave, non-blocking, stops as soon as the main UI is ready), selectable through the new `splashAnimation` setting: `wave` (default), `logo-pulse`, `particle-storm`, or `off`
 - Built-in `reverie` memory extension: the model's accumulated user profile lives in a single append-only `%APPDATA%/.pipi/reverie.md` (XDG config dir on non-Windows); the snapshot is injected once per session as a static system prompt section (prompt-prefix caching is never invalidated), and a standing reminder makes the model call the new `reverie` tool after each turn to append one sentence about the user
 - Dedicated `ThinkingBlockComponent` for rendering assistant thinking runs (collapsible header with click-to-toggle, italic reasoning body); replaces the inline thinking rendering in assistant messages
 - First-time setup now offers guided custom model configuration (API base URL, API type, model ID, and API key); the result is saved to `models.json` as the `custom` provider and set as the default model
 - Built-in `expert-team` extension: `/experts <question>` runs independent model conversations for each expert persona in parallel and merges them into a synthesis; `/experts` without arguments browses past transcripts
-- Built-in `plan` extension: the model switches between plan mode and agent mode by itself via the `plan_mode` tool (enter disables write tools for read-only design; `save_plan` persists the Markdown plan under `%APPDATA%/.pipi/plan/--工作区example--/`; exit restores full tool access to implement). `/plan <topic>` enters plan mode and hands the topic to the model, `/plan` toggles the mode, `/todos` views the list, and `/plans` opens saved plans for line-level editing where the model rewrites the selected line (Ctrl+Z reverts)
-- Cold start splash animation in interactive mode (theme-colored wave, non-blocking, stops as soon as the main UI is ready)
+- Built-in `plan` extension: the model switches between plan mode and agent mode by itself via the `plan_mode` tool (enter disables write tools for read-only design; `save_plan` persists the Markdown plan under `%APPDATA%/.pipi/plan/`; exit restores full tool access to implement). `/plan <topic>` enters plan mode and hands the topic to the model, `/plan` toggles the mode, `/todos` views the list, and `/plans` opens saved plans for line-level editing where the model rewrites the selected line (Ctrl+Z reverts)
+- Built-in `rewind` extension: `/rewind` lists the user messages on the active branch and goes back to the one you pick, moving the conversation and restoring files edited since. `/rewind --list` only lists. Reverses `edit` calls exactly (the session recorded both sides of the replacement) and reports `write` and `bash` calls as not reversible, since the session never stored the previous content for those. Runs as a dry run first and backs up every file it writes to `<cwd>/.rewind-backup`
 
 ### Fixed
 
