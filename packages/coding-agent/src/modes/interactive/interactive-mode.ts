@@ -999,9 +999,14 @@ export class InteractiveMode {
 		this.ui.start();
 		// Splash plays over the managed-tool/extension loading window and is removed
 		// once the editor becomes interactive; it never adds startup latency.
-		const splash = new SplashAnimation(this.ui);
-		this.documentContainer.addChild(splash);
-		splash.start();
+		// `quietStartup: true` silences startup output entirely, so the splash goes with it.
+		const splashStyle =
+			this.settingsManager.getQuietStartup() === true ? "off" : this.settingsManager.getSplashAnimation();
+		const splash = splashStyle === "off" ? undefined : new SplashAnimation(this.ui, splashStyle);
+		if (splash) {
+			this.documentContainer.addChild(splash);
+			splash.start();
+		}
 		this.isInitialized = true;
 		this.programStatus.report();
 		this.ensurePngTranscoder();
@@ -1100,8 +1105,8 @@ export class InteractiveMode {
 		// Enable the remaining input handlers only after managed-tool setup completes.
 		this.setupKeyHandlers();
 		this.setupEditorSubmitHandler();
-		splash.stop();
-		this.documentContainer.removeChild(splash);
+		splash?.stop();
+		if (splash) this.documentContainer.removeChild(splash);
 		this.ui.requestRender();
 
 		// Initialize extensions first so resources are shown before messages

@@ -20,6 +20,7 @@ import type {
 	QuietStartup,
 	SessionShareDestination,
 	Settings,
+	SplashAnimation,
 	ThinkingBudgetsSettings,
 	TransportSetting,
 	TuiMode,
@@ -44,6 +45,7 @@ export type {
 	RetrySettings,
 	SessionShareDestination,
 	Settings,
+	SplashAnimation,
 	TerminalSettings,
 	ThinkingBudgetsSettings,
 	TransportSetting,
@@ -82,7 +84,7 @@ function deepMergeObjects(base: Record<string, unknown>, overrides: Record<strin
 }
 
 /** Tools enabled at startup when `defaultTools` does not change them. */
-export const DEFAULT_TOOL_NAMES: readonly string[] = ["read", "bash", "edit", "write"];
+export const DEFAULT_TOOL_NAMES: readonly string[] = ["read", "bash", "edit", "write", "grep"];
 
 /** Whether a tool selection entry is a `+name` or `-name` modifier. */
 export function isToolModifier(entry: unknown): boolean {
@@ -1001,6 +1003,19 @@ export class SettingsManager {
 	setQuietStartup(quiet: QuietStartup): void {
 		this.globalSettings.quietStartup = quiet;
 		this.markModified("quietStartup");
+		this.save();
+	}
+
+	getSplashAnimation(): SplashAnimation {
+		const value = this.globalSettings.splashAnimation;
+		return value === "logo-pulse" || value === "particle-storm" || value === "off"
+			? value
+			: SETTINGS_DEFAULTS.splashAnimation;
+	}
+
+	setSplashAnimation(animation: SplashAnimation): void {
+		this.globalSettings.splashAnimation = animation;
+		this.markModified("splashAnimation");
 		this.save();
 	}
 

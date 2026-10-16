@@ -145,6 +145,14 @@ Keep `retry.provider.maxRetries` at `0` unless provider-level retries are requir
 
 See [Shell aliases](shell-aliases.md) for shell setup and [Pi Packages](packages.md) for package-manager behavior.
 
+## Appearance
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `splashAnimation` | `"wave" \| "logo-pulse" \| "particle-storm" \| "off"` | `"wave"` | Cold start animation shown while managed tools (`fd`, `rg`) load. `"off"` never shows one, and `quietStartup: true` silences it too. `"logo-pulse"` centers the pi logo under an orbiting glow; `"particle-storm"` fills the wait with a drifting braille field. A narrow terminal falls back from `"particle-storm"` to `"logo-pulse"`. **Can only be set in agent-directory settings.** |
+
+The splash is decorative and removed as soon as the editor is interactive, so it never adds startup latency. An unrecognized value falls back to `"wave"` rather than failing startup.
+
 ## Resources
 
 Resource paths in user settings resolve from the agent directory. Paths in project settings resolve from the project `.pi` directory. Absolute paths and `~` are supported.

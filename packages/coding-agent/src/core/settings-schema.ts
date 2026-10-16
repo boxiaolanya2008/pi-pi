@@ -263,6 +263,15 @@ export const SettingsSchema = Type.Object(
 				default: SETTINGS_DEFAULTS.quietStartup,
 			}),
 		),
+		splashAnimation: Type.Optional(
+			Type.Union(
+				[Type.Literal("wave"), Type.Literal("logo-pulse"), Type.Literal("particle-storm"), Type.Literal("off")],
+				{
+					description: 'Cold start animation shown while managed tools load. "off" never shows one. Global only.',
+					default: SETTINGS_DEFAULTS.splashAnimation,
+				},
+			),
+		),
 		defaultProjectTrust: Type.Optional(
 			Type.Union([Type.Literal("ask"), Type.Literal("always"), Type.Literal("never")], {
 				description: "Global setting only.",
@@ -470,6 +479,7 @@ export type CodemodeMode = Static<typeof CodemodeModeSchema>;
 export interface CodemodeSettings extends Static<typeof CodemodeSettingsSchema> {}
 export type DefaultProjectTrust = NonNullable<SettingsInput["defaultProjectTrust"]>;
 export type QuietStartup = NonNullable<SettingsInput["quietStartup"]>;
+export type SplashAnimation = NonNullable<SettingsInput["splashAnimation"]>;
 export type TransportSetting = NonNullable<SettingsInput["transport"]>;
 export type SessionShareDestination = NonNullable<SettingsInput["sessionShareDestination"]>;
 export type PackageSource = Static<typeof PackageSourceSchema>;
