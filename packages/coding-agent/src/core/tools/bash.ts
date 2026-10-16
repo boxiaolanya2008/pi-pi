@@ -238,7 +238,18 @@ export interface ShellToolConfig {
 	promptSnippet: string;
 	promptGuidelines?: readonly string[];
 	tempFilePrefix: string;
+	/**
+	 * Guidance for the command syntax this tool's shell accepts. Set when the resolved shell is not the
+	 * one the model would assume, so its first command already succeeds instead of failing and retrying.
+	 */
+	dialectGuidance?: string;
 }
+
+const POWERSHELL_DIALECT_GUIDANCE =
+	"This machine has no bash, so commands run in PowerShell. Write PowerShell syntax, not POSIX: " +
+	"`ls -la` is `Get-ChildItem -Force`, `grep -r x .` is `Select-String -Path . -Pattern x -Recurse`, " +
+	"`cat f` is `Get-Content f`, `find . -name x` is `Get-ChildItem -Recurse -Filter x`, " +
+	"pipes work, and `&&` separates commands. Do not send POSIX commands.";
 
 export function createShellToolDefinition(
 	cwd: string,
@@ -253,7 +264,9 @@ export function createShellToolDefinition(
 		name: config.name,
 		label: config.label,
 		description: `Execute a ${config.shellName} command in the current working directory. Returns stdout and stderr. Output is truncated to last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.`,
-		promptSnippet: config.promptSnippet,
+		promptSnippet: config.dialectGuidance
+			? `${config.promptSnippet}. ${config.dialectGuidance}`
+			: config.promptSnippet,
 		promptGuidelines: exposeSessionEnvironment && config.promptGuidelines ? [...config.promptGuidelines] : undefined,
 		parameters: bashSchema,
 		outputSchema: bashOutputSchema,
@@ -428,7 +441,24 @@ export function createBashToolDefinition(
 	cwd: string,
 	options?: BashToolOptions,
 ): ToolDefinition<typeof bashSchema, BashToolDetails | undefined, BashRenderState> {
-	return createShellToolDefinition(cwd, bashToolConfig, options);
+	// Only local execution needs a resolved shell. A caller supplying its own operations (SSH, sandbox)
+	// decides the shell itself, so probing here would be both wrong and a startup cost.
+	if (options?.operations) return createShellToolDefinition(cwd, bashToolConfig, options);
+
+	const dialectGuidance = describeShellDialect(options?.shellPath);
+	return createShellToolDefinition(cwd, { ...bashToolConfig, dialectGuidance }, options);
+}
+
+/**
+ * Guidance when the resolved shell is not POSIX, or undefined when it is. Resolution failures return
+ * undefined: the tool's own error already explains the problem, and a startup probe must not add one.
+ */
+function describeShellDialect(shellPath?: string): string | undefined {
+	try {
+		return getShellConfig(shellPath).dialect === "powershell" ? POWERSHELL_DIALECT_GUIDANCE : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 export function createBashTool(cwd: string, options?: BashToolOptions): AgentTool<typeof bashSchema> {

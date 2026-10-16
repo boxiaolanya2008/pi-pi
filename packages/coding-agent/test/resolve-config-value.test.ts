@@ -109,6 +109,7 @@ describe("resolveConfigValue", () => {
 			shell: "/bin/bash",
 			args: ["-s"],
 			commandTransport: "stdin",
+			dialect: "posix",
 		});
 		try {
 			Object.defineProperty(process, "platform", { configurable: true, value: "win32" });

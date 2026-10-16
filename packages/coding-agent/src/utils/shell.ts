@@ -7,7 +7,15 @@ export interface ShellConfig {
 	shell: string;
 	args: string[];
 	commandTransport?: "argv" | "stdin";
+	/**
+	 * Command syntax the resolved shell accepts. The model must be told which one, because a POSIX
+	 * command sent to PowerShell fails, and a failing tool call costs a retry round trip.
+	 */
+	dialect: ShellDialect;
 }
+
+/** Command syntax accepted by a shell. `posix` covers bash, sh, zsh; `powershell` covers pwsh and powershell.exe. */
+export type ShellDialect = "posix" | "powershell";
 
 /**
  * Find bash executable on PATH (cross-platform)
@@ -18,7 +26,9 @@ function isLegacyWslBashPath(path: string): boolean {
 }
 
 function getBashShellConfig(shell: string): ShellConfig {
-	return isLegacyWslBashPath(shell) ? { shell, args: ["-s"], commandTransport: "stdin" } : { shell, args: ["-c"] };
+	return isLegacyWslBashPath(shell)
+		? { shell, args: ["-s"], commandTransport: "stdin", dialect: "posix" }
+		: { shell, args: ["-c"], dialect: "posix" };
 }
 
 function findExecutableOnPath(executable: string): string | null {
@@ -97,8 +107,15 @@ export function getShellConfig(customShellPath?: string): ShellConfig {
 			return getBashShellConfig(bashOnPath);
 		}
 
+		// 4. Fallback: PowerShell, which ships with Windows. The model is told the dialect so it sends
+		//    PowerShell syntax instead of POSIX, which would otherwise fail on every call.
+		const powershell = findPowerShellOnPath();
+		if (powershell) {
+			return { shell: powershell, args: [...POWERSHELL_ARGS], dialect: "powershell" };
+		}
+
 		throw new Error(
-			`No bash shell found. Options:\n` +
+			`No usable shell found. Options:\n` +
 				`  1. Install Git for Windows: https://git-scm.com/download/win\n` +
 				`  2. Add your bash to PATH (Cygwin, MSYS2, etc.)\n` +
 				"  3. Set shellPath in settings.json\n\n" +
@@ -116,10 +133,15 @@ export function getShellConfig(customShellPath?: string): ShellConfig {
 		return getBashShellConfig(bashOnPath);
 	}
 
-	return { shell: "sh", args: ["-c"] };
+	return { shell: "sh", args: ["-c"], dialect: "posix" };
 }
 
 export const POWERSHELL_ARGS = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"] as const;
+
+/** Resolve PowerShell on Windows, preferring PowerShell 7. Returns undefined when neither is installed. */
+function findPowerShellOnPath(): string | undefined {
+	return findExecutableOnPath("pwsh.exe") ?? findExecutableOnPath("powershell.exe") ?? undefined;
+}
 
 /** Resolve PowerShell on Windows, preferring PowerShell 7 when available. */
 export function getPowerShellConfig(): ShellConfig {
@@ -127,12 +149,12 @@ export function getPowerShellConfig(): ShellConfig {
 		throw new Error("The powershell tool is only available on Windows.");
 	}
 
-	const shell = findExecutableOnPath("pwsh.exe") ?? findExecutableOnPath("powershell.exe");
+	const shell = findPowerShellOnPath();
 	if (!shell) {
 		throw new Error("No PowerShell executable found. Install PowerShell or add powershell.exe/pwsh.exe to PATH.");
 	}
 
-	return { shell, args: [...POWERSHELL_ARGS] };
+	return { shell, args: [...POWERSHELL_ARGS], dialect: "powershell" };
 }
 
 export function getShellEnv(): NodeJS.ProcessEnv {

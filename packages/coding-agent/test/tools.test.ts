@@ -645,6 +645,7 @@ describe("Coding Agent Tools", () => {
 			vi.spyOn(shellModule, "getShellConfig").mockReturnValueOnce({
 				shell: "/nonexistent-shell-path-xyz123",
 				args: ["-c"],
+				dialect: "posix",
 			});
 
 			const bashWithBadShell = createBashTool(testDir);
@@ -682,6 +683,7 @@ describe("Coding Agent Tools", () => {
 					'let input = ""; process.stdin.setEncoding("utf8"); process.stdin.on("data", (chunk) => { input += chunk; }); process.stdin.on("end", () => { process.stdout.write(input); });',
 				],
 				commandTransport: "stdin",
+				dialect: "posix",
 			});
 			const chunks: Buffer[] = [];
 			const ops = createLocalBashOperations({ shellPath: "C:\\Windows\\System32\\bash.exe" });
