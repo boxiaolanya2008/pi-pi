@@ -679,6 +679,14 @@ interface SelfUpdatePlan {
 	version: string;
 	shouldRun: boolean;
 	note?: string;
+	/**
+	 * How the manifest says to install the new version, when it says so at all.
+	 *
+	 * This fork installs from a working copy and is published nowhere, so there is no registry spec to
+	 * run. When the manifest explains the update, that instruction replaces the npm/pnpm/yarn/bun path
+	 * instead of sending the user at a package that does not exist.
+	 */
+	install?: string;
 }
 
 async function getSelfUpdatePlan(force: boolean): Promise<SelfUpdatePlan> {
@@ -702,6 +710,7 @@ async function getSelfUpdatePlan(force: boolean): Promise<SelfUpdatePlan> {
 			installSpec,
 			version: latestRelease.version,
 			...(latestRelease.note ? { note: latestRelease.note } : {}),
+			...(latestRelease.install ? { install: latestRelease.install } : {}),
 			shouldRun: true,
 		};
 	}
@@ -1058,6 +1067,18 @@ export async function handlePackageCommand(
 					}
 					const selfUpdatePlan = await getSelfUpdatePlan(options.force);
 					if (!selfUpdatePlan.shouldRun) {
+						return true;
+					}
+					if (selfUpdatePlan.install) {
+						// The manifest knows how this installation is updated, so run nothing: there is no package to
+						// fetch. This is the local working-copy flow.
+						if (selfUpdatePlan.note) {
+							printSelfUpdateNote(selfUpdatePlan.note);
+						}
+						console.log(chalk.yellow(`${APP_NAME} is installed from a working copy and cannot update itself.`));
+						console.log(chalk.dim(`Update from ${VERSION} to ${selfUpdatePlan.version} with:`));
+						console.log();
+						console.log(`  ${chalk.bold(selfUpdatePlan.install)}`);
 						return true;
 					}
 					if (managedInstallRoot) {

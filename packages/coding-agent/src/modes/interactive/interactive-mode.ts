@@ -4658,9 +4658,15 @@ export class InteractiveMode {
 	}
 
 	showNewVersionNotification(release: LatestPiRelease): void {
+		// This fork installs from a working copy, so the manifest can explain how to update it. Fall back to
+		// the upstream wording only when it does not.
+		const installCommand = release.install?.trim();
 		const updateInstruction = () =>
-			theme.fg("muted", `New version ${release.version} is available. Run `) +
-			theme.fg("accent", `${APP_NAME} update`);
+			installCommand
+				? theme.fg("muted", `New version ${release.version} is available. Update with: `) +
+					theme.fg("accent", installCommand)
+				: theme.fg("muted", `New version ${release.version} is available. Run `) +
+					theme.fg("accent", `${APP_NAME} update`);
 		const changelogUrl = "https://pi.dev/changelog";
 		const changelogLine = () => {
 			const changelogLink = getCapabilities().hyperlinks

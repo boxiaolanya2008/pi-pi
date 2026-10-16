@@ -1,0 +1,6 @@
+{
+	"version": "1.2.0",
+	"note": "Pi-Pi 从工作副本本地安装，不发布到任何 npm registry。更新方式是拉取仓库后重新安装。",
+	"url": "https://github.com/boxiaolanya2008/pi-pi",
+	"install": "git pull && install.bat   (Windows)   或   git pull && npm run install:local"
+}

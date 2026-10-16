@@ -2,13 +2,27 @@ import { compare, valid } from "semver";
 import { fetchWithRetry } from "./management-http.ts";
 import { getPiUserAgent } from "./pi-user-agent.ts";
 
-const LATEST_VERSION_URL = "https://pi.dev/api/latest-version";
+const DEFAULT_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/boxiaolanya2008/pi-pi/main/update.json";
 const DEFAULT_VERSION_CHECK_TIMEOUT_MS = 10000;
+
+/**
+ * Where to read the latest release from.
+ *
+ * This fork is installed from a working copy and published to no registry, so it cannot ask the
+ * upstream release endpoint: that would announce upstream versions this fork does not ship, and
+ * `pi update` would then install upstream's package over this one. The default points at the
+ * repository's own manifest; `PI_UPDATE_URL` overrides it for a mirror or a local file.
+ */
+export function getUpdateManifestUrl(): string {
+	return process.env.PI_UPDATE_URL?.trim() || DEFAULT_UPDATE_MANIFEST_URL;
+}
 
 export interface LatestPiRelease {
 	version: string;
 	packageName?: string;
 	note?: string;
+	/** How to install the new version, when the manifest explains it. */
+	install?: string;
 }
 
 /** Include useful errno details hidden behind Node's generic "fetch failed" error. */
@@ -55,7 +69,7 @@ export async function getLatestPiRelease(
 	if (process.env.PI_OFFLINE) return undefined;
 
 	const response = await fetchWithRetry(
-		LATEST_VERSION_URL,
+		getUpdateManifestUrl(),
 		{
 			headers: {
 				"User-Agent": getPiUserAgent(currentVersion),
@@ -70,6 +84,7 @@ export async function getLatestPiRelease(
 	if (!response.ok) return undefined;
 
 	const data = (await response.json()) as {
+		install?: unknown;
 		packageName?: unknown;
 		version?: unknown;
 		note?: unknown;
@@ -80,10 +95,12 @@ export async function getLatestPiRelease(
 	const packageName =
 		typeof data.packageName === "string" && data.packageName.trim() ? data.packageName.trim() : undefined;
 	const note = typeof data.note === "string" && data.note.trim() ? data.note.trim() : undefined;
+	const install = typeof data.install === "string" && data.install.trim() ? data.install.trim() : undefined;
 	return {
 		version: data.version.trim(),
 		packageName,
 		...(note ? { note } : {}),
+		...(install ? { install } : {}),
 	};
 }
 
