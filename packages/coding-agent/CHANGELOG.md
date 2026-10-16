@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-16
+
 ### Changed
 
 - Replaced the default system prompt preamble with the minimalist multi-module architect persona (Chinese, verbatim product spec), and translated the static prompt sections (tools footer, rules, docs guide, project-context header) into Chinese; dynamic per-tool guideline bullets remain in their original language
