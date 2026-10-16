@@ -73,8 +73,6 @@ export default function planExtension(pi: ExtensionAPI): void {
 		}
 	};
 
-	const persistTodos = () => pi.appendEntry(TODO_ENTRY_TYPE, { todos, nextId });
-
 	function updateWidgets(ctx: ExtensionContext): void {
 		const th = ctx.ui.theme;
 		if (todos.length > 0) {
@@ -304,23 +302,6 @@ export default function planExtension(pi: ExtensionAPI): void {
 				},
 				{ triggerTurn: false },
 			);
-
-			// Nothing is created until the user confirms.
-			const choice = await ctx.ui.select("Generate TODO list from this plan?", [
-				"Yes, create todos",
-				"No, keep the plan only",
-			]);
-			if (choice !== "Yes, create todos") return;
-
-			todos = parseChecklist(markdown).map((text, i) => ({ id: i + 1, text, done: false }));
-			nextId = todos.length + 1;
-			if (todos.length === 0) {
-				ctx.ui.notify("The plan has no checklist items; no todos created.", "info");
-				return;
-			}
-			persistTodos();
-			updateWidgets(ctx);
-			ctx.ui.notify(`Created ${todos.length} todos from the plan.`, "info");
 		},
 	});
 
@@ -420,13 +401,4 @@ async function rewriteLine(
 		.replace(/\n?```$/i, "")
 		.replace(/^["'`](.*)["'`]$/s, "$1")
 		.split(/\r?\n/)[0];
-}
-
-/** Extract unchecked checklist item texts from a Markdown plan. */
-function parseChecklist(markdown: string): string[] {
-	return markdown
-		.split(/\r?\n/)
-		.map((line) => line.match(/^\s*[-*]\s*\[\s*\]\s*(.+)$/))
-		.filter((match): match is RegExpMatchArray => match !== null)
-		.map((match) => match[1].trim());
 }

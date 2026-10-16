@@ -1,5 +1,5 @@
 import * as Diff from "diff";
-import { theme } from "../theme/theme.ts";
+import { getLanguageFromPath, highlightCode, theme } from "../theme/theme.ts";
 
 /**
  * Parse diff line to extract prefix, line number, and content.
@@ -66,7 +66,7 @@ function renderIntraLineDiff(oldContent: string, newContent: string): { removedL
 }
 
 export interface RenderDiffOptions {
-	/** File path (unused, kept for API compatibility) */
+	/** File path used to pick the syntax-highlighting language for content lines. */
 	filePath?: string;
 }
 
@@ -76,9 +76,22 @@ export interface RenderDiffOptions {
  * - Removed lines: red, with inverse on changed tokens
  * - Added lines: green, with inverse on changed tokens
  */
-export function renderDiff(diffText: string, _options: RenderDiffOptions = {}): string {
+export function renderDiff(diffText: string, options: RenderDiffOptions = {}): string {
 	const lines = diffText.split("\n");
 	const result: string[] = [];
+	// With a known language, content lines get syntax highlighting instead of a
+	// wrapping theme color (hljs spans reset SGR state, which would cut the
+	// outer color mid-line); the +/- prefix and line number carry the diff hue.
+	const lang = options.filePath ? getLanguageFromPath(options.filePath) : undefined;
+	const highlight = (content: string): string => {
+		const text = replaceTabs(content);
+		if (!lang) return text;
+		return highlightCode(text, lang)[0] ?? text;
+	};
+	const prefixOf = (prefix: string, lineNum: string, style: "removed" | "added" | "context"): string => {
+		const color = style === "removed" ? "toolDiffRemoved" : style === "added" ? "toolDiffAdded" : "toolDiffContext";
+		return theme.fg(color, `${prefix}${lineNum} `);
+	};
 
 	let i = 0;
 	while (i < lines.length) {
@@ -112,7 +125,9 @@ export function renderDiff(diffText: string, _options: RenderDiffOptions = {}): 
 
 			// Only do intra-line diffing when there's exactly one removed and one added line
 			// (indicating a single line modification). Otherwise, show lines as-is.
-			if (removedLines.length === 1 && addedLines.length === 1) {
+			// With syntax highlighting, skip intra-line inverse marking: hljs spans
+			// reset SGR state and would fight the inverse attribute.
+			if (removedLines.length === 1 && addedLines.length === 1 && !lang) {
 				const removed = removedLines[0];
 				const added = addedLines[0];
 
@@ -126,19 +141,35 @@ export function renderDiff(diffText: string, _options: RenderDiffOptions = {}): 
 			} else {
 				// Show all removed lines first, then all added lines
 				for (const removed of removedLines) {
-					result.push(theme.fg("toolDiffRemoved", `-${removed.lineNum} ${replaceTabs(removed.content)}`));
+					result.push(
+						lang
+							? prefixOf("-", removed.lineNum, "removed") + highlight(removed.content)
+							: theme.fg("toolDiffRemoved", `-${removed.lineNum} ${replaceTabs(removed.content)}`),
+					);
 				}
 				for (const added of addedLines) {
-					result.push(theme.fg("toolDiffAdded", `+${added.lineNum} ${replaceTabs(added.content)}`));
+					result.push(
+						lang
+							? prefixOf("+", added.lineNum, "added") + highlight(added.content)
+							: theme.fg("toolDiffAdded", `+${added.lineNum} ${replaceTabs(added.content)}`),
+					);
 				}
 			}
 		} else if (parsed.prefix === "+") {
 			// Standalone added line
-			result.push(theme.fg("toolDiffAdded", `+${parsed.lineNum} ${replaceTabs(parsed.content)}`));
+			result.push(
+				lang
+					? prefixOf("+", parsed.lineNum, "added") + highlight(parsed.content)
+					: theme.fg("toolDiffAdded", `+${parsed.lineNum} ${replaceTabs(parsed.content)}`),
+			);
 			i++;
 		} else {
 			// Context line
-			result.push(theme.fg("toolDiffContext", ` ${parsed.lineNum} ${replaceTabs(parsed.content)}`));
+			result.push(
+				lang
+					? prefixOf(" ", parsed.lineNum, "context") + highlight(parsed.content)
+					: theme.fg("toolDiffContext", ` ${parsed.lineNum} ${replaceTabs(parsed.content)}`),
+			);
 			i++;
 		}
 	}

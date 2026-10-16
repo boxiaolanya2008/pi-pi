@@ -145,7 +145,11 @@ function buildEditCallComponent(
 	}
 
 	const body =
-		"error" in component.preview ? theme.fg("error", component.preview.error) : renderDiff(component.preview.diff);
+		"error" in component.preview
+			? theme.fg("error", component.preview.error)
+			: renderDiff(component.preview.diff, {
+					filePath: getRenderablePreviewInput(args as RenderableEditArgs | undefined)?.path,
+				});
 	component.addChild(new Spacer(1));
 	component.addChild(new Text(body, 0, 0));
 	return component;
