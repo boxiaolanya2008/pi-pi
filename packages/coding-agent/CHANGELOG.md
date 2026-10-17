@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Images now attach in interactive mode. A pasted screenshot, a dropped file, or a typed path to a `.png`/`.jpg`/`.jpeg`/`.webp`/`.gif`/`.bmp` was sent as plain text, so the model had to spend a `read` round trip to see it; those paths are now resolved into image attachments before the message is sent. Only existing files with a supported extension are taken, so a path mentioned in prose stays in the text, and a load failure is reported instead of dropping the image silently
+
 ### Changed
 
 - Markdown code blocks no longer draw their fence characters. The `` ``` `` lines were Markdown syntax, not content, so they are replaced by a left bar: the language becomes a label above the block and each line keeps the bar, which reads as a block without echoing the source markup

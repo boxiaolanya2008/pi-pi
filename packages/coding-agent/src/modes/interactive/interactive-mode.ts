@@ -1,3 +1,9 @@
+/** One submission: the text the user sent, plus any images pulled out of it. */
+interface SubmittedInput {
+	text: string;
+	images: ImageContent[];
+}
+
 /**
  * Interactive mode for the coding agent.
  * Handles TUI rendering and user interaction, delegating business logic to AgentSession.
@@ -126,6 +132,7 @@ import { getChangelogPath, getNewEntries, normalizeChangelogLinks, parseChangelo
 import { copyToClipboard, readClipboardFilePaths, readClipboardText } from "../../utils/clipboard.ts";
 import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipboard-image.ts";
 import { parseGitUrl } from "../../utils/git.ts";
+import { extractImagePaths, loadImageAttachments } from "../../utils/image-attachments.ts";
 import { ensurePngTranscoder } from "../../utils/image-convert.ts";
 import { getCwdRelativePath } from "../../utils/paths.ts";
 import { getPiUserAgent } from "../../utils/pi-user-agent.ts";
@@ -477,8 +484,8 @@ export class InteractiveMode {
 	private keybindings: KeybindingsManager;
 	private version: string;
 	private isInitialized = false;
-	private onInputCallback?: (text: string) => void;
-	private pendingUserInputs: string[] = [];
+	private onInputCallback?: (input: SubmittedInput) => void;
+	private pendingUserInputs: SubmittedInput[] = [];
 	private activeStatusIndicator: StatusIndicator | undefined = undefined;
 	private activeWorkingIndicatorEmbedded = false;
 	private readonly idleStatus = new IdleStatus();
@@ -1265,7 +1272,10 @@ export class InteractiveMode {
 		while (true) {
 			const userInput = await this.getUserInput();
 			try {
-				await this.session.prompt(userInput);
+				await this.session.prompt(
+					userInput.text,
+					userInput.images.length > 0 ? { images: userInput.images } : undefined,
+				);
 			} catch (error: unknown) {
 				const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
 				this.showError(errorMessage);
@@ -3389,9 +3399,13 @@ export class InteractiveMode {
 			// If streaming, use prompt() with steer behavior
 			// This handles extension commands (execute immediately), prompt template expansion, and queueing
 			if (this.session.isStreaming) {
-				this.editor.addToHistory?.(text);
+				const submitted = await this.withImageAttachments(text);
+				this.editor.addToHistory?.(submitted.text);
 				this.editor.setText("");
-				await this.session.prompt(text, { streamingBehavior: "steer" });
+				await this.session.prompt(submitted.text, {
+					streamingBehavior: "steer",
+					...(submitted.images.length > 0 ? { images: submitted.images } : {}),
+				});
 				this.updatePendingMessagesDisplay();
 				this.ui.requestRender();
 				return;
@@ -3401,13 +3415,42 @@ export class InteractiveMode {
 			// First, move any pending bash components to chat
 			this.flushPendingBashComponents();
 
+			const submitted = await this.withImageAttachments(text);
 			if (this.onInputCallback) {
-				this.onInputCallback(text);
+				this.onInputCallback(submitted);
 			} else {
-				this.pendingUserInputs.push(text);
+				this.pendingUserInputs.push(submitted);
 			}
-			this.editor.addToHistory?.(text);
+			this.editor.addToHistory?.(submitted.text);
 		};
+	}
+
+	/**
+	 * Turn image paths in a submission into real attachments.
+	 *
+	 * The clipboard handler writes a pasted image to a temp file and inserts the bare path, and nothing in
+	 * interactive mode converted it, so a picture reached the model as a line of text and cost a `read`
+	 * round trip. Only paths to existing, supported images are taken; anything else stays as typed. A load
+	 * failure is reported and the text is sent unchanged, never silently dropped.
+	 */
+	private async withImageAttachments(text: string): Promise<SubmittedInput> {
+		const { text: remaining, paths } = extractImagePaths(text, this.sessionManager.getCwd());
+		if (paths.length === 0) return { text, images: [] };
+
+		try {
+			const { images, failures } = await loadImageAttachments(paths, {
+				autoResizeImages: this.settingsManager.getImageAutoResize(),
+			});
+			for (const failure of failures) {
+				this.showWarning(`Could not attach ${failure.path}: ${failure.message}`);
+			}
+			if (images.length === 0) return { text, images: [] };
+			// A message that was only an image still needs something for the model to read.
+			return { text: remaining || "(image attached)", images };
+		} catch (error) {
+			this.showWarning(`Could not attach images: ${error instanceof Error ? error.message : String(error)}`);
+			return { text, images: [] };
+		}
 	}
 
 	private subscribeToAgent(): void {
@@ -4268,16 +4311,16 @@ export class InteractiveMode {
 		);
 	}
 
-	async getUserInput(): Promise<string> {
+	async getUserInput(): Promise<SubmittedInput> {
 		const queuedInput = this.pendingUserInputs.shift();
 		if (queuedInput !== undefined) {
 			return queuedInput;
 		}
 
 		return new Promise((resolve) => {
-			this.onInputCallback = (text: string) => {
+			this.onInputCallback = (input: SubmittedInput) => {
 				this.onInputCallback = undefined;
-				resolve(text);
+				resolve(input);
 			};
 		});
 	}
