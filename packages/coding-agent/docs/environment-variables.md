@@ -114,7 +114,37 @@ This is a guard, not a sandbox. [Security](security.md) still applies: tool call
 | `PI_RESTRICT_TO_WORKSPACE` | `0`, `false`, or `no` turns the guard off |
 | `PI_WORKSPACE_EXTRA_ROOTS` | Allowed trees beyond the working directory, separated by the platform path delimiter (`;` on Windows, `:` elsewhere), resolved against the working directory |
 | `PI_ALLOW_SHELL_WRITES` | Set to `1`, `true`, or `yes` to let shell commands write files again |
+| `PI_MESSAGE_TRIM` | Set to `0`, `false`, or `no` to stop trimming a large pasted block out of a user message |
+| `PI_MESSAGE_TRIM_MIN_LINES` | Lines a pasted block needs before it is moved out of the message; default `300` |
+| `PI_MESSAGE_TRIM_MIN_CHARS` | Message size at which moving a block is considered at all; default `20000` |
+| `PI_TOOL_RESULT_TRIM` | Set to `0`, `false`, or `no` to stop eliding old tool results from the request |
+| `PI_TOOL_RESULT_KEEP` | How many of the newest tool results stay intact; default `8` |
+| `PI_TOOL_RESULT_BUDGET` | Token budget for all tool results together before elision starts; default `20000` |
 
 Because `ExtensionContext` exposes no settings handle, both are environment variables rather than `settings.json` entries.
+
+<a id="request-trims"></a>
+
+## Request trims
+
+Two trims reduce what each request carries. Neither modifies the session: the transcript, `/rewind`, and
+export still show everything, and a tool can always be run again.
+
+**A large pasted block leaves the message.** The editor collapses a big paste for display, then expands it
+on submit, so a pasted log used to become a full-length user message that every later request carried. A
+block of at least 300 lines, in a message of at least 20000 characters, is written to
+`<agent-dir>/pastes/` and the message points at it. Duplicate lines are folded with a count, over-long
+payload tokens are shortened, and blank runs are collapsed. Fenced code is left exactly as written.
+
+**Old tool results leave the request context.** Results are resent on every later request, and a few large
+reads dominate the bill long after the model stopped reading them. Results beyond the newest eight, and
+beyond a 20k-token budget, are replaced by a stub naming the tool. A codemode call record is dropped with
+its output. This costs one prefix cache miss per result when it is first elided; a stub is deterministic,
+so the prefix is stable afterwards.
+
+A separate model call to rewrite the user's message is not offered. The message is carried by every later
+request, so shortening `N` tokens to `M` saves `T * (N - M)` over `T` requests, but the call itself
+costs about `N + M`. For a normal short message that is a net loss, and whether the meaning survived cannot
+be checked automatically. Moving the payload out is lossless and free, so it does the work instead.
 
 Shell commands may not write files. A redirection, `tee`, in-place `sed`, or PowerShell `Set-Content` is refused, and the model is told to use the `write` or `edit` tool instead: those are exact and reviewable, while a shell write silently produces whatever the quoting happened to mean. `2>&1`, `> /dev/null`, and `> nul` discard output rather than writing a file, so they stay allowed. Use `PI_ALLOW_SHELL_WRITES=1` when a shell write is genuinely needed.

@@ -1,4 +1,9 @@
-# Compaction Reference
+# Compaction
+
+> Compaction rewrites the conversation. Two smaller, request-time trims sit next to it and are
+described in [Environment variables](environment-variables.md#workspace-guard): a large pasted block is
+moved out of the user message, and old tool results are replaced by a stub in the request context. Neither
+modifies the session, so `/rewind`, export, and the transcript still show everything. Reference
 
 This reference describes automatic compaction, branch summarization, persisted entries, and extension hooks. For the user workflow, see [Sessions and Context](sessions.md#manage-conversation-context).
 

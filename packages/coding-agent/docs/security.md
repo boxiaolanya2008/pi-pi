@@ -32,6 +32,8 @@ Project trust is not a complete startup boundary. Pi reads the project `sessionD
 
 Project trust does not limit what tool calls can access or affect. After Pi starts, enabled tools still use the operating-system permissions of the Pi process. Instructions and other content in the folder can also influence the model.
 
+The [workspace guard](environment-variables.md#workspace-guard) is a related but separate control: it blocks tool calls that reach outside the working directory, and refuses shell commands that write files. Both are guard rails for ordinary work, not a sandbox. A shell command can still reach outside once it runs, so the isolation advice below still applies.
+
 ### Resources protected by project trust
 
 Pi requires a project-trust decision when it finds any of these resources from the current working directory:
