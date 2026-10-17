@@ -7,6 +7,7 @@ import messageTrimExtension from "./message-trim/index.ts";
 import planExtension from "./plan/index.ts";
 import reverieExtension from "./reverie/index.ts";
 import rewindExtension from "./rewind/index.ts";
+import toolResultTrimExtension from "./tool-result-trim/index.ts";
 import toolSearchExtension from "./tool-search/index.ts";
 import workspaceGuardExtension from "./workspace-guard/index.ts";
 
@@ -19,6 +20,7 @@ export const builtInExtensions: InlineExtension[] = [
 	// Runs first among the built-ins it can affect: the guard blocks before any tool executes.
 	{ name: "workspace-guard", factory: workspaceGuardExtension, builtin: true },
 	{ name: "message-trim", factory: messageTrimExtension, builtin: true },
+	{ name: "tool-result-trim", factory: toolResultTrimExtension, builtin: true },
 	// Replaceable: an extension that registers `codemode`, `tool_search`, or `/mcp` (such as a third-party
 	// MCP extension) takes over instead of running alongside the built-in one.
 	{ name: "codemode", factory: codemodeExtension, replaceable: true, builtin: true },
