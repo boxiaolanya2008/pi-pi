@@ -16,6 +16,8 @@
 const DEFAULT_MIN_BLOCK_LINES = 300;
 /** Message size below which nothing is moved, however it is shaped. */
 const DEFAULT_MIN_MESSAGE_CHARS = 20_000;
+/** Below this the message is left alone entirely, so a one-liner is never churned. */
+const DETERMINISTIC_FLOOR_CHARS = 1000;
 /** Consecutive blank lines that always end a block. */
 const BLANK_LINES_END_BLOCK = 3;
 /**
@@ -170,13 +172,16 @@ export function trimMessage(text: string, writer: BlockWriter | undefined, optio
 	const minMessageChars = options.minMessageChars ?? DEFAULT_MIN_MESSAGE_CHARS;
 	const unchanged: TrimResult = { text, removedLines: 0, foldedLines: 0, shortenedTokens: 0 };
 
-	if (text.length < minMessageChars) return unchanged;
+	// The deterministic rules are cheap and safe, so they run on any message worth touching. Moving a
+	// block is the invasive part, so it keeps the stricter size gate: a short message with one huge
+	// line (a base64 blob, a minified bundle) still gets that line shortened.
+	if (text.length < DETERMINISTIC_FLOOR_CHARS) return unchanged;
 
 	let lines = text.split("\n");
 	let removedLines = 0;
 	let savedPath: string | undefined;
 
-	const block = findLongestBlock(lines);
+	const block = text.length >= minMessageChars ? findLongestBlock(lines) : undefined;
 	if (block && block.end - block.start >= minBlockLines && writer) {
 		const content = lines.slice(block.start, block.end).join("\n");
 		try {

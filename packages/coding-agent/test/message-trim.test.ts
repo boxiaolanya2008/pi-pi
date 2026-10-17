@@ -102,7 +102,7 @@ describe("trimMessage", () => {
 	});
 
 	it("does not fold blank lines into a count", () => {
-		const text = `a\n\n\n\n\nb`.padEnd(200, "y");
+		const text = `a\n\n\n\n\nb`.padEnd(1200, "y");
 		const result = trimMessage(text, undefined, { minMessageChars: 100 });
 		assert.ok(!result.text.includes("(x"), `blank runs must not be folded: ${JSON.stringify(result.text)}`);
 	});
@@ -115,13 +115,13 @@ describe("trimMessage", () => {
 	});
 
 	it("collapses runs of blank lines to one", () => {
-		const text = `para one\n\n\n\n\npara two`.padEnd(200, "y");
+		const text = `para one\n\n\n\n\npara two`.padEnd(1200, "y");
 		const result = trimMessage(text, undefined, { minMessageChars: 100 });
 		assert.ok(result.text.includes("para one\n\npara two"), JSON.stringify(result.text));
 	});
 
 	it("removes trailing whitespace", () => {
-		const text = `a   \nb\t\t`.padEnd(200, "y");
+		const text = `a   \nb\t\t`.padEnd(1200, "y");
 		const result = trimMessage(text, undefined, { minMessageChars: 100 });
 		assert.ok(!/[ \t]+\n/.test(result.text), JSON.stringify(result.text));
 	});
