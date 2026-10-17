@@ -74,25 +74,56 @@ function checkPathTool(event: ToolCallEvent, roots: readonly string[], cwd: stri
 	return reason ? { toolName: event.toolName, target: input.path, reason } : undefined;
 }
 
+/**
+ * Replace quoted spans with spaces, so text that merely *mentions* a shell operator is not read as one.
+ * `git commit -m "fix: a > b"` writes no file. A command hidden inside quotes (`bash -c "rm -rf x"`)
+ * is still caught, because the command-name patterns run against the raw text.
+ */
+function withoutQuotedSpans(command: string): string {
+	return command.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, (span) => " ".repeat(span.length));
+}
+
+interface WritePattern {
+	pattern: RegExp;
+	what: string;
+	/** Match against the command with quoted spans blanked, for operators rather than command names. */
+	quotedOnly?: boolean;
+}
+
 /** Shell features that create or modify files, which must go through the `write` and `edit` tools. */
-const WRITE_PATTERNS: { pattern: RegExp; what: string }[] = [
+const WRITE_PATTERNS: WritePattern[] = [
 	// Redirection to a real target. `2>&1`, `>/dev/null`, and `>nul` discard output and write nothing.
-	{ pattern: /\d?>>?\s*(?!&\d|\/dev\/null\b|nul\b|\$null\b)\S/, what: "output redirection" },
-	{ pattern: /\b(?:tee|truncate|dd)\b/, what: "tee/truncate/dd" },
-	{ pattern: /\bsed\b[^|;]*\s(?:-i|--in-place)\b/, what: "in-place sed" },
-	{ pattern: /\b(?:touch|mkdir|rmdir|rm|mv|cp|chmod|chown|ln)\b/, what: "file mutation command" },
+	// Tested outside quotes, and excluding `=` and `-` before the bracket so `=>` and `->` do not match.
+	{
+		pattern: /(?<![=<>-])\d?>>?\s*(?!&\d|\/dev\/null\b|nul\b|\$null\b)\S/,
+		what: "output redirection",
+		quotedOnly: true,
+	},
+	{
+		pattern: /(?:^|[;&|(]\s*)(?:(?:sudo|doas|command)\s+)*(?:tee|truncate|dd)\s+\S/,
+		what: "tee/truncate/dd",
+	},
+	{ pattern: /(?:^|[;&|(]\s*)sed\b[^|;]*\s(?:-i|--in-place)\b/, what: "in-place sed" },
+	{
+		pattern:
+			/(?:^|[;&|(]\s*)(?:(?:sudo|doas|command|time|nice|env)\s+)*(?:touch|mkdir|rmdir|rm|mv|cp|chmod|chown|ln)\s+\S/,
+		what: "file mutation command",
+	},
 	{
 		pattern:
 			/\b(?:Set-Content|Add-Content|Out-File|New-Item|Remove-Item|Move-Item|Copy-Item|Clear-Content|Rename-Item)\b/i,
 		what: "PowerShell file command",
 	},
-	{ pattern: /\b(?:del|erase|ren|rd|md)\b/i, what: "cmd file command" },
+	{ pattern: /(?:^|[;&|(]\s*)(?:del|erase|ren|rd|md)\s+\S/i, what: "cmd file command" },
 ];
 
 /** The write-like shell feature a command uses, or undefined when it only reads. */
 export function findShellWrite(command: string): string | undefined {
-	for (const { pattern, what } of WRITE_PATTERNS) {
-		if (pattern.test(command)) return what;
+	const unquoted = withoutQuotedSpans(command);
+	for (const { pattern, what, quotedOnly } of WRITE_PATTERNS) {
+		// Reset `lastIndex` defensively: a future pattern with the `g` flag would otherwise carry state.
+		pattern.lastIndex = 0;
+		if (pattern.test(quotedOnly ? unquoted : command)) return what;
 	}
 	return undefined;
 }
