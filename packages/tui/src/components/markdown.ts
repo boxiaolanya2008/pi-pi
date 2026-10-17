@@ -528,24 +528,28 @@ export class Markdown implements Component {
 			}
 
 			case "code": {
+				// The fence characters are Markdown syntax, not content, so they are not drawn. A left bar
+				// marks the block instead, and the language becomes a label above it.
 				const indent = this.theme.codeBlockIndent ?? "  ";
-				// The fence info string is the language followed by arbitrary metadata (```ts title="x").
-				// Only the language selects highlighting, so drop the rest instead of printing it in the border.
+				// The info string is the language followed by arbitrary metadata (```ts title="x").
+				// Only the language selects highlighting.
 				const lang = token.lang?.trim().split(/\s+/)[0] ?? "";
-				lines.push(this.theme.codeBlockBorder(`\`\`\`${lang}`));
+				const bar = this.theme.codeBlockBorder("│ ");
+				if (lang) {
+					lines.push(`${bar}${this.theme.codeBlockBorder(lang)}`);
+				}
 				if (this.theme.highlightCode) {
 					const highlightedLines = this.theme.highlightCode(token.text, lang || undefined);
 					for (const hlLine of highlightedLines) {
-						lines.push(`${indent}${hlLine}`);
+						lines.push(`${bar}${indent}${hlLine}`);
 					}
 				} else {
 					// Split code by newlines and style each line
 					const codeLines = token.text.split("\n");
 					for (const codeLine of codeLines) {
-						lines.push(`${indent}${this.theme.codeBlock(codeLine)}`);
+						lines.push(`${bar}${indent}${this.theme.codeBlock(codeLine)}`);
 					}
 				}
-				lines.push(this.theme.codeBlockBorder("```"));
 				if (nextTokenType && nextTokenType !== "space") {
 					lines.push(""); // Add spacing after code blocks (unless space token follows)
 				}

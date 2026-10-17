@@ -323,7 +323,7 @@ describe("Markdown component", () => {
 
 			const lines = markdown.render(24).map((line) => stripAnsi(line).trimEnd());
 
-			assert.deepStrictEqual(lines, ["- ```ts", "    alpha beta gamma", "  delta epsilon zeta", "  ```"]);
+			assert.deepStrictEqual(lines, ["- │ ts", "  │   alpha beta gamma", "  delta epsilon zeta"]);
 		});
 	});
 
@@ -931,7 +931,7 @@ A=
 			const markdown = new Markdown(source, 0, 0, defaultMarkdownTheme);
 			const lines = markdown.render(80).map((line) => stripAnsi(line).trimEnd());
 
-			assert.deepStrictEqual(lines, ["Escaped $x-y$.", "", "```text", "  $\\mathbb{C}^3$", "```"]);
+			assert.deepStrictEqual(lines, ["Escaped $x-y$.", "", "│ text", "│   $\\mathbb{C}^3$"]);
 		});
 
 		it("allows LaTeX rendering to be disabled", () => {
@@ -1114,16 +1114,16 @@ again, hello world`,
 			const lines = markdown.render(80);
 			const plainLines = lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").trimEnd());
 
-			const closingBackticksIndex = plainLines.indexOf("```");
-			assert.ok(closingBackticksIndex !== -1, "Should have closing backticks");
+			const lastCodeLineIndex = plainLines.map((line) => line.startsWith("│")).lastIndexOf(true);
+			assert.ok(lastCodeLineIndex !== -1, "Should have rendered a code block");
 
-			const afterBackticks = plainLines.slice(closingBackticksIndex + 1);
-			const emptyLineCount = afterBackticks.findIndex((line) => line !== "");
+			const afterCode = plainLines.slice(lastCodeLineIndex + 1);
+			const emptyLineCount = afterCode.findIndex((line) => line !== "");
 
 			assert.strictEqual(
 				emptyLineCount,
 				1,
-				`Expected 1 empty line after code block, but found ${emptyLineCount}. Lines after backticks: ${JSON.stringify(afterBackticks.slice(0, 5))}`,
+				`Expected 1 empty line after code block, but found ${emptyLineCount}. Lines after code: ${JSON.stringify(afterCode.slice(0, 5))}`,
 			);
 		});
 
@@ -1142,7 +1142,7 @@ code block
 
 more text`,
 			];
-			const expectedLines = ["hello this is text", "", "```", "  code block", "```", "", "more text"];
+			const expectedLines = ["hello this is text", "", "│   code block", "", "more text"];
 
 			for (const text of cases) {
 				const markdown = new Markdown(text, 0, 0, defaultMarkdownTheme);
@@ -1732,16 +1732,16 @@ bar`,
 	describe("Code fence info strings", () => {
 		it("prints only the language and drops fence metadata", () => {
 			const cases = [
-				{ input: "```ts\nconst x = 1;\n```", expected: ["```ts", "  const x = 1;", "```"] },
+				{ input: "```ts\nconst x = 1;\n```", expected: ["│ ts", "│   const x = 1;"] },
 				{
 					input: '```ts title="src/a.ts"\nconst x = 1;\n```',
-					expected: ["```ts", "  const x = 1;", "```"],
+					expected: ["│ ts", "│   const x = 1;"],
 				},
 				{
 					input: "```python showLineNumbers\nprint(1)\n```",
-					expected: ["```python", "  print(1)", "```"],
+					expected: ["│ python", "│   print(1)"],
 				},
-				{ input: "```\nplain\n```", expected: ["```", "  plain", "```"] },
+				{ input: "```\nplain\n```", expected: ["│   plain"] },
 			];
 
 			for (const { input, expected } of cases) {
@@ -1758,27 +1758,28 @@ bar`,
 			const cases = [
 				{
 					input: "```ts\nconst x = 1;\n``",
-					expected: ["```ts", "  const x = 1;", "```"],
+					expected: ["│ ts", "│   const x = 1;"],
 				},
 				{
 					input: "```md\nnot a closing fence:\n``\n```",
-					expected: ["```md", "  not a closing fence:", "  ``", "```"],
+					expected: ["│ md", "│   not a closing fence:", "│   ``"],
 				},
 				{
 					input: "```ts\n``",
-					expected: ["```ts", "", "```"],
+					// The trailing backticks read as a partial closing fence while streaming, so the body is empty.
+					expected: ["│ ts", "│"],
 				},
 				{
 					input: "````\n```",
-					expected: ["```", "", "```"],
+					expected: ["│"],
 				},
 				{
 					input: "~~~~~\n~~~~",
-					expected: ["```", "", "```"],
+					expected: ["│"],
 				},
 				{
 					input: "```md\nnot a closing fence:\n``\n```\n\nafter",
-					expected: ["```md", "  not a closing fence:", "  ``", "```", "", "after"],
+					expected: ["│ md", "│   not a closing fence:", "│   ``", "", "after"],
 				},
 			];
 
