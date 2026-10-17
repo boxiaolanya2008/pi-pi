@@ -466,6 +466,8 @@ ${chalk.bold("Environment Variables:")}
   PI_TELEMETRY                     - Override install telemetry when set to 1/true/yes or 0/false/no
   PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/)
   PI_UPDATE_URL                    - Update manifest URL (default: this fork's update.json)
+  PI_RESTRICT_TO_WORKSPACE         - Set to 0/false/no to allow tools outside the workspace
+  PI_WORKSPACE_EXTRA_ROOTS         - Additional allowed trees, separated by the path delimiter
 
 ${chalk.bold("Built-in Tool Names:")}
   read       - Read file contents

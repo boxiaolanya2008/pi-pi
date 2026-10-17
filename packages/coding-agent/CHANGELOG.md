@@ -12,6 +12,7 @@
 
 ### Added
 
+- Built-in `workspace-guard` extension: the tools stay inside the directory Pi was started in. Every `path` input, plus the `command` of `bash` and `powershell`, is resolved and compared against the working directory through symlinks and `~`, and a call that reaches outside is blocked with a reason the model can act on. A guard rather than a sandbox: a shell can still reach outside once it runs, and the command scan skips flags and URLs. Turn it off with `PI_RESTRICT_TO_WORKSPACE=0`, allow more trees with `PI_WORKSPACE_EXTRA_ROOTS`
 - Cold start splash animation in interactive mode (theme-colored wave, non-blocking, stops as soon as the main UI is ready), selectable through the new `splashAnimation` setting: `wave` (default), `logo-pulse`, `particle-storm`, or `off`
 - Built-in `reverie` memory extension: the model's accumulated user profile lives in a single append-only `%APPDATA%/.pipi/reverie.md` (XDG config dir on non-Windows); the snapshot is injected once per session as a static system prompt section (prompt-prefix caching is never invalidated), and a standing reminder makes the model call the new `reverie` tool after each turn to append one sentence about the user
 - Dedicated `ThinkingBlockComponent` for rendering assistant thinking runs (collapsible header with click-to-toggle, italic reasoning body); replaces the inline thinking rendering in assistant messages

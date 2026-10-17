@@ -82,6 +82,8 @@ These variables are read by Pi itself:
 | `PI_CODING_AGENT_SESSION_DIR` | Override session storage; overridden by `--session-dir` |
 | `PI_PACKAGE_DIR` | Override the package directory, useful for Nix/Guix store paths |
 | `PI_OFFLINE` | Disable automatic network activity, including model catalog refreshes |
+| `PI_RESTRICT_TO_WORKSPACE` | Set to `0`, `false`, or `no` to let tools reach outside the working directory. See [Workspace guard](#workspace-guard) |
+| `PI_WORKSPACE_EXTRA_ROOTS` | Additional allowed trees for the workspace guard, separated by the platform path delimiter |
 | `PI_SKIP_VERSION_CHECK` | Disable the `pi.dev` latest-version request |
 | `PI_TELEMETRY` | Override install/update telemetry and provider attribution headers: `1`/`true`/`yes` or `0`/`false`/`no` |
 | `PI_CACHE_RETENTION` | Set to `long` for extended provider prompt caching where supported |
@@ -98,3 +100,18 @@ These variables are read by Pi itself:
 | `HTTP_PROXY`, `HTTPS_PROXY` | Proxy outbound HTTP requests |
 
 Provider credentials such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and provider-specific configuration are listed in [Providers](providers.md#use-an-api-key-from-the-environment).
+
+<a id="workspace-guard"></a>
+
+## Workspace guard
+
+By default the tools stay inside the directory Pi was started in. Before any tool runs, its `path` (or the `command` of `bash` and `powershell`) is resolved and compared against that directory, including through symlinks and `~`. A call that reaches outside is blocked with a reason the model can act on.
+
+This is a guard, not a sandbox. [Security](security.md) still applies: tool calls run with the permissions of the Pi process, so a shell command can reach outside once it runs. The token scan for shell commands skips flags and URLs rather than guessing at them. The guard buys discipline, not isolation.
+
+| Variable | Effect |
+|---|---|
+| `PI_RESTRICT_TO_WORKSPACE` | `0`, `false`, or `no` turns the guard off |
+| `PI_WORKSPACE_EXTRA_ROOTS` | Allowed trees beyond the working directory, separated by the platform path delimiter (`;` on Windows, `:` elsewhere), resolved against the working directory |
+
+Because `ExtensionContext` exposes no settings handle, both are environment variables rather than `settings.json` entries.

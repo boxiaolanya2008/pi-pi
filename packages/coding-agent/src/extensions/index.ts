@@ -7,6 +7,7 @@ import planExtension from "./plan/index.ts";
 import reverieExtension from "./reverie/index.ts";
 import rewindExtension from "./rewind/index.ts";
 import toolSearchExtension from "./tool-search/index.ts";
+import workspaceGuardExtension from "./workspace-guard/index.ts";
 
 export const builtInExtensions: InlineExtension[] = [
 	{ name: "llama.cpp", factory: llamaExtension, builtin: true },
@@ -14,6 +15,8 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "plan", factory: planExtension, builtin: true },
 	{ name: "rewind", factory: rewindExtension, builtin: true },
 	{ name: "reverie", factory: reverieExtension, builtin: true },
+	// Runs first among the built-ins it can affect: the guard blocks before any tool executes.
+	{ name: "workspace-guard", factory: workspaceGuardExtension, builtin: true },
 	// Replaceable: an extension that registers `codemode`, `tool_search`, or `/mcp` (such as a third-party
 	// MCP extension) takes over instead of running alongside the built-in one.
 	{ name: "codemode", factory: codemodeExtension, replaceable: true, builtin: true },
