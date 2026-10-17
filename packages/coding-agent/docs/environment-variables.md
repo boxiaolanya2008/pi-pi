@@ -113,5 +113,8 @@ This is a guard, not a sandbox. [Security](security.md) still applies: tool call
 |---|---|
 | `PI_RESTRICT_TO_WORKSPACE` | `0`, `false`, or `no` turns the guard off |
 | `PI_WORKSPACE_EXTRA_ROOTS` | Allowed trees beyond the working directory, separated by the platform path delimiter (`;` on Windows, `:` elsewhere), resolved against the working directory |
+| `PI_ALLOW_SHELL_WRITES` | Set to `1`, `true`, or `yes` to let shell commands write files again |
 
 Because `ExtensionContext` exposes no settings handle, both are environment variables rather than `settings.json` entries.
+
+Shell commands may not write files. A redirection, `tee`, in-place `sed`, or PowerShell `Set-Content` is refused, and the model is told to use the `write` or `edit` tool instead: those are exact and reviewable, while a shell write silently produces whatever the quoting happened to mean. `2>&1`, `> /dev/null`, and `> nul` discard output rather than writing a file, so they stay allowed. Use `PI_ALLOW_SHELL_WRITES=1` when a shell write is genuinely needed.

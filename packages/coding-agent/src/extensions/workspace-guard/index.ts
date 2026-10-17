@@ -14,6 +14,11 @@
  * adding one would change the public extension API for a single toggle:
  * - `PI_RESTRICT_TO_WORKSPACE=0` (or `false`/`no`) turns the guard off.
  * - `PI_WORKSPACE_EXTRA_ROOTS` adds allowed trees, separated by the platform path delimiter.
+ * - `PI_ALLOW_SHELL_WRITES=1` lets shell commands write files again (see below).
+ *
+ * Shell commands are also refused when they write files. The `write` and `edit` tools are exact and
+ * reviewable; a redirection or an in-place `sed` silently produces something else, and a quoting mistake
+ * corrupts the file. The model is told to use the tools instead.
  */
 
 import { delimiter, resolve } from "node:path";
@@ -69,6 +74,49 @@ function checkPathTool(event: ToolCallEvent, roots: readonly string[], cwd: stri
 	return reason ? { toolName: event.toolName, target: input.path, reason } : undefined;
 }
 
+/** Shell features that create or modify files, which must go through the `write` and `edit` tools. */
+const WRITE_PATTERNS: { pattern: RegExp; what: string }[] = [
+	// Redirection to a real target. `2>&1`, `>/dev/null`, and `>nul` discard output and write nothing.
+	{ pattern: /\d?>>?\s*(?!&\d|\/dev\/null\b|nul\b|\$null\b)\S/, what: "output redirection" },
+	{ pattern: /\b(?:tee|truncate|dd)\b/, what: "tee/truncate/dd" },
+	{ pattern: /\bsed\b[^|;]*\s(?:-i|--in-place)\b/, what: "in-place sed" },
+	{ pattern: /\b(?:touch|mkdir|rmdir|rm|mv|cp|chmod|chown|ln)\b/, what: "file mutation command" },
+	{
+		pattern:
+			/\b(?:Set-Content|Add-Content|Out-File|New-Item|Remove-Item|Move-Item|Copy-Item|Clear-Content|Rename-Item)\b/i,
+		what: "PowerShell file command",
+	},
+	{ pattern: /\b(?:del|erase|ren|rd|md)\b/i, what: "cmd file command" },
+];
+
+/** The write-like shell feature a command uses, or undefined when it only reads. */
+export function findShellWrite(command: string): string | undefined {
+	for (const { pattern, what } of WRITE_PATTERNS) {
+		if (pattern.test(command)) return what;
+	}
+	return undefined;
+}
+
+/** Writing through the shell is refused unless explicitly allowed. */
+function shellWritesAllowed(): boolean {
+	const value = process.env.PI_ALLOW_SHELL_WRITES?.trim().toLowerCase();
+	return value === "1" || value === "true" || value === "yes";
+}
+
+function checkShellWrite(event: ToolCallEvent): Blocked | undefined {
+	if (!SHELL_TOOLS.has(event.toolName)) return undefined;
+	if (shellWritesAllowed()) return undefined;
+	const input = event.input as { command?: unknown };
+	if (typeof input.command !== "string" || input.command.length === 0) return undefined;
+	const what = findShellWrite(input.command);
+	if (!what) return undefined;
+	return {
+		toolName: event.toolName,
+		target: what,
+		reason: `shell commands may not write files (found ${what}). Use the write tool to create or overwrite a file, or the edit tool to change one; both are exact and reviewable. Set PI_ALLOW_SHELL_WRITES=1 only if you really need a shell write.`,
+	};
+}
+
 function checkShellTool(event: ToolCallEvent, roots: readonly string[], cwd: string): Blocked | undefined {
 	if (!SHELL_TOOLS.has(event.toolName)) return undefined;
 	const input = event.input as { command?: unknown };
@@ -100,7 +148,7 @@ export default function workspaceGuardExtension(pi: ExtensionAPI): void {
 
 		const cwd = ctx.cwd;
 		const roots = [cwd, ...extraRoots(cwd)];
-		const blocked = checkPathTool(event, roots, cwd) ?? checkShellTool(event, roots, cwd);
+		const blocked = checkShellWrite(event) ?? checkPathTool(event, roots, cwd) ?? checkShellTool(event, roots, cwd);
 		if (!blocked) return undefined;
 
 		ctx.ui.notify(`Blocked ${blocked.toolName}: ${blocked.target}`, "warning");

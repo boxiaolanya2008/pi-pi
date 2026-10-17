@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Markdown code blocks no longer draw their fence characters. The `` ``` `` lines were Markdown syntax, not content, so they are replaced by a left bar: the language becomes a label above the block and each line keeps the bar, which reads as a block without echoing the source markup
+- Shell commands may not write files. Redirections, `tee`, in-place `sed`, and PowerShell file commands are refused in favour of the `write` and `edit` tools, which are exact and reviewable; `2>&1`, `> /dev/null`, and `> nul` discard output rather than writing, so they stay allowed. Lift it with `PI_ALLOW_SHELL_WRITES=1`
+
 ## [1.3.0] - 2026-10-16
 
 ### Changed

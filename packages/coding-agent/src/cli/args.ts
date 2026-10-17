@@ -468,6 +468,7 @@ ${chalk.bold("Environment Variables:")}
   PI_UPDATE_URL                    - Update manifest URL (default: this fork's update.json)
   PI_RESTRICT_TO_WORKSPACE         - Set to 0/false/no to allow tools outside the workspace
   PI_WORKSPACE_EXTRA_ROOTS         - Additional allowed trees, separated by the path delimiter
+  PI_ALLOW_SHELL_WRITES            - Set to 1/true/yes to let shell commands write files
 
 ${chalk.bold("Built-in Tool Names:")}
   read       - Read file contents

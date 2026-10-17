@@ -75,6 +75,9 @@ export interface PathCandidate {
 /** A home-relative token cannot be resolved without expanding `~`, so it is reported as-is. */
 const HOME_PREFIX = /^(?:~|\$HOME\b|\$\{HOME\}|%USERPROFILE%|%HOMEDRIVE%|%HOMEPATH%)/i;
 
+/** Device sinks and null targets: writing to them touches no file, so they are not project paths. */
+const NULL_DEVICE = /^(?:\/dev\/(?:null|stdout|stderr|tty|zero)|nul(?:l)?|\$null|&\d)$/i;
+
 /** Absolute forms: POSIX root, Windows drive, or UNC share. */
 const ABSOLUTE_PATH = /^(?:[\\/]|[A-Za-z]:[\\/]|\\\\[^\\/])/;
 
@@ -96,6 +99,8 @@ export function findPathTokens(command: string): string[] {
 		if (token.startsWith("-")) continue;
 		// URLs contain `://` and their path part is not on this filesystem.
 		if (token.includes("://")) continue;
+		// `/dev/null` and `nul` are sinks, not files in the project.
+		if (NULL_DEVICE.test(token)) continue;
 		if (HOME_PREFIX.test(token) || ABSOLUTE_PATH.test(token) || token.split(/[\\/]/).includes("..")) {
 			tokens.push(token);
 		}
