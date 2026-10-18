@@ -209,6 +209,13 @@ function buildRules(
 		}
 	}
 
+	// Token discipline. Deliberately short: a long rule about saving tokens would spend tokens on every
+	// single request, and this section is cached, not free per turn.
+	addRule("只输出变更的代码块，未修改部分用 `...` 代替；代码块外不写解释");
+	addRule("只改动被指出的位置，禁止重构或修改无关代码");
+	addRule("需要替换代码时只给该函数或类的完整代码，不重复文件其余部分");
+	addRule("直接给最终结果，不复述此前的错误或道歉");
+
 	for (const name of selectedTools) {
 		for (const rule of toolGuidelines[name] ?? []) addRule(rule);
 	}
