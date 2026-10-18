@@ -1,11 +1,14 @@
 import type { InlineExtension } from "../core/extensions/types.ts";
 import codemodeExtension from "./codemode/index.ts";
 import expertTeamExtension from "./expert-team/index.ts";
+import filemapExtension from "./filemap/index.ts";
 import llamaExtension from "./llama/index.ts";
 import mcpExtension from "./mcp/index.ts";
 import messageTrimExtension from "./message-trim/index.ts";
 import modesExtension from "./modes/index.ts";
 import planExtension from "./plan/index.ts";
+import projectMapExtension from "./project-map/index.ts";
+import readDisciplineExtension from "./read-discipline/index.ts";
 import reverieExtension from "./reverie/index.ts";
 import rewindExtension from "./rewind/index.ts";
 import toolResultTrimExtension from "./tool-result-trim/index.ts";
@@ -19,8 +22,12 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "rewind", factory: rewindExtension, builtin: true },
 	{ name: "reverie", factory: reverieExtension, builtin: true },
 	{ name: "modes", factory: modesExtension, builtin: true },
+	{ name: "project-map", factory: projectMapExtension, builtin: true },
+	{ name: "filemap", factory: filemapExtension, builtin: true },
 	// Runs first among the built-ins it can affect: the guard blocks before any tool executes.
 	{ name: "workspace-guard", factory: workspaceGuardExtension, builtin: true },
+	// Follows workspace-guard: nudges the model toward read() without changing tool behavior.
+	{ name: "read-discipline", factory: readDisciplineExtension, builtin: true },
 	{ name: "message-trim", factory: messageTrimExtension, builtin: true },
 	{ name: "tool-result-trim", factory: toolResultTrimExtension, builtin: true },
 	// Replaceable: an extension that registers `codemode`, `tool_search`, or `/mcp` (such as a third-party
