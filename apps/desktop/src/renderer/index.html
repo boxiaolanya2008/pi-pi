@@ -8,19 +8,20 @@
 			content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
 		/>
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Pi</title>
+		<title>Pi-Pi</title>
 		<link rel="stylesheet" href="./styles.css" />
 	</head>
 	<body>
 		<header class="bar">
 			<div class="bar-left">
-				<span class="name">Pi</span>
-				<button id="folder" type="button" title="Choose working folder">Choose folder</button>
+				<span class="name">Pi-Pi</span>
+				<button id="folder" type="button" title="Choose working folder">Folder</button>
+				<button id="commands" type="button" title="Run a command">Commands</button>
 				<span id="cwd" class="muted"></span>
 			</div>
 			<div class="bar-right">
-				<span id="model" class="muted"></span>
-				<span id="thinking" class="pill" hidden></span>
+				<button id="model" type="button" title="Choose a model">model</button>
+				<button id="thinking" type="button" title="Set thinking level">thinking</button>
 				<button id="abort" type="button" hidden>Stop</button>
 			</div>
 		</header>
@@ -31,12 +32,26 @@
 			<textarea
 				id="input"
 				rows="1"
-				placeholder="Ask Pi to change something. Enter to send, Shift+Enter for a new line."
+				placeholder="Ask Pi-Pi to change something. Enter to send, / for commands, Shift+Enter for a new line."
 			></textarea>
 			<button id="send" type="button">Send</button>
 		</footer>
 
 		<div id="status" class="status" hidden></div>
+
+		<!-- Answers the questions extension commands ask through the UI context. -->
+		<div id="modal" class="modal" hidden>
+			<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+				<h2 id="dialog-title"></h2>
+				<p id="dialog-body"></p>
+				<input id="dialog-input" type="text" hidden />
+				<ul id="dialog-options" class="options"></ul>
+				<div class="dialog-actions">
+					<button id="dialog-cancel" type="button">Cancel</button>
+					<button id="dialog-ok" type="button">OK</button>
+				</div>
+			</div>
+		</div>
 
 		<script type="module" src="./renderer.js"></script>
 	</body>

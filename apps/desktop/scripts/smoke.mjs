@@ -59,6 +59,8 @@ child.on("exit", () => {
 		["renderer painted", result.rendererPainted],
 		["agent session ready", result.sessionReady],
 		["tools exposed", (result.toolCount ?? 0) > 0],
+		["commands registered", (result.commandCount ?? 0) > 0],
+		["models available", (result.modelCount ?? 0) > 0],
 	];
 	let ok = true;
 	for (const [label, passed] of checks) {
@@ -66,6 +68,8 @@ child.on("exit", () => {
 		if (!passed) ok = false;
 	}
 	if (result.toolCount !== undefined) console.log(`     tools: ${result.toolCount}`);
+	if (result.commandCount !== undefined) console.log(`     commands: ${result.commandCount}`);
+	if (result.modelCount !== undefined) console.log(`     models: ${result.modelCount}`);
 	if (stderr.trim()) console.log(`--- stderr ---\n${stderr.trim().split("\n").slice(0, 10).join("\n")}`);
 	process.exitCode = ok ? 0 : 1;
 });

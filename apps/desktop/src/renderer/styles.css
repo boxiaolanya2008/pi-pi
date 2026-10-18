@@ -73,15 +73,8 @@ body {
 	white-space: nowrap;
 }
 
-.pill {
-	padding: 2px 8px;
-	border: 1px solid var(--border);
-	border-radius: 999px;
-	color: var(--text-muted);
-	font-size: 11px;
-}
-
 button {
+	max-width: 240px;
 	padding: 5px 12px;
 	border: 1px solid var(--border);
 	border-radius: 8px;
@@ -90,6 +83,9 @@ button {
 	font: inherit;
 	font-size: 13px;
 	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 button:hover:not(:disabled) {
@@ -104,6 +100,7 @@ button:disabled {
 #abort {
 	border-color: var(--danger);
 	color: var(--danger);
+	flex: none;
 }
 
 .transcript {
@@ -138,10 +135,6 @@ button:disabled {
 .msg.assistant .body {
 	font-family: var(--font-mono);
 	font-size: 13px;
-}
-
-.msg.user .body {
-	color: var(--text);
 }
 
 .msg.toolResult .body,
@@ -184,6 +177,7 @@ button:disabled {
 #send {
 	align-self: end;
 	height: 38px;
+	flex: none;
 }
 
 .status {
@@ -192,6 +186,95 @@ button:disabled {
 	background: var(--surface-raised);
 	color: var(--danger);
 	font-size: 12px;
+}
+
+/* The modal answers the questions extension commands ask through the UI context. */
+.modal {
+	position: fixed;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	background: rgb(0 0 0 / 55%);
+	padding: 24px;
+	z-index: 10;
+}
+
+.modal[hidden] {
+	display: none;
+}
+
+.dialog {
+	width: min(560px, 100%);
+	max-height: 70vh;
+	overflow-y: auto;
+	padding: 20px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--surface-raised);
+	box-shadow: 0 18px 48px rgb(0 0 0 / 45%);
+}
+
+.dialog h2 {
+	margin: 0 0 10px;
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.dialog p {
+	margin: 0 0 14px;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+#dialog-input {
+	width: 100%;
+	padding: 9px 11px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--font-mono);
+	font-size: 13px;
+}
+
+#dialog-input:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+.options {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 44vh;
+	overflow-y: auto;
+}
+
+.options button {
+	width: 100%;
+	text-align: left;
+	border: none;
+	background: transparent;
+	padding: 8px 10px;
+	border-radius: 8px;
+	color: var(--text);
+	font-family: var(--font-mono);
+	font-size: 13px;
+}
+
+.options button:hover {
+	background: var(--bg);
+	border-color: var(--accent);
+}
+
+.dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 16px;
 }
 
 @media (prefers-reduced-motion: no-preference) {

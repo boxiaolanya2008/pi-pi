@@ -56,7 +56,10 @@
 		"release:minor": "node scripts/release.mjs minor",
 		"release:major": "node scripts/release.mjs major",
 		"release:fix-links": "node scripts/release-notes.mjs fix-github-releases",
-		"prepare": "husky"
+		"prepare": "husky",
+		"dev": "npm run dev --workspace apps/desktop",
+		"dev:desktop": "npm run dev --workspace apps/desktop",
+		"smoke": "npm run smoke --workspace apps/desktop"
 	},
 	"devDependencies": {
 		"@anthropic-ai/sandbox-runtime": "0.0.26",

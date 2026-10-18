@@ -7,7 +7,16 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
-import { IPC, type DesktopEvent, type PiBridge, type SendPromptResult, type SessionSnapshot } from "./shared.ts";
+import {
+	IPC,
+	type CommandOption,
+	type DesktopEvent,
+	type ModelOption,
+	type PastedImage,
+	type PiBridge,
+	type SendPromptResult,
+	type SessionSnapshot,
+} from "./shared.ts";
 
 const bridge: PiBridge = {
 	getSnapshot: () => ipcRenderer.invoke(IPC.snapshot) as Promise<SessionSnapshot>,
@@ -15,6 +24,17 @@ const bridge: PiBridge = {
 	abort: () => ipcRenderer.invoke(IPC.abort) as Promise<void>,
 	chooseFolder: () => ipcRenderer.invoke(IPC.chooseFolder) as Promise<string | undefined>,
 	setCwd: (cwd) => ipcRenderer.invoke(IPC.setCwd, cwd) as Promise<SendPromptResult>,
+	listCommands: () => ipcRenderer.invoke(IPC.listCommands) as Promise<CommandOption[]>,
+	runCommand: (name, args) => ipcRenderer.invoke(IPC.runCommand, name, args) as Promise<SendPromptResult>,
+	listModels: () => ipcRenderer.invoke(IPC.listModels) as Promise<ModelOption[]>,
+	setModel: (id, provider) => ipcRenderer.invoke(IPC.setModel, id, provider) as Promise<SendPromptResult>,
+	listThinking: () => ipcRenderer.invoke(IPC.listThinking) as Promise<string[]>,
+	setThinking: (level) => ipcRenderer.invoke(IPC.setThinking, level) as Promise<SendPromptResult>,
+	pasteImage: (data, mimeType) =>
+		ipcRenderer.invoke(IPC.pasteImage, data, mimeType) as Promise<PastedImage>,
+	respond: (id, value) => {
+		ipcRenderer.send(IPC.respond, id, value);
+	},
 	onEvent: (listener) => {
 		// The IpcRendererEvent carries a sender handle and must not reach the renderer, so only the payload
 		// is forwarded.
