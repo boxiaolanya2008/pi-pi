@@ -18,6 +18,10 @@ function userText(text: string): ElidableMessage {
 	return { role: "user", content: [{ type: "text", text }] };
 }
 
+function assistantText(text: string): ElidableMessage {
+	return { role: "assistant", content: [{ type: "text", text }] };
+}
+
 /** A payload of roughly `chars` characters. */
 function payload(chars: number): string {
 	return "x".repeat(chars);
@@ -113,5 +117,106 @@ describe("elideToolResults", () => {
 		const messages = Array.from({ length: 10 }, () => toolResult(payload(40_000)));
 		const result = elideToolResults(messages, { keepRecent: 2, budgetTokens: 5000 });
 		assert.ok(result.savedChars > 8 * 39_000, `expected a large saving, got ${result.savedChars}`);
+	});
+});
+
+describe("elideToolResults (turn-anchored)", () => {
+	it("never elides current-turn results while previous turns fit the budget", () => {
+		const messages = [
+			userText("task"),
+			toolResult(payload(40_000)),
+			toolResult(payload(40_000)),
+			toolResult(payload(40_000)),
+		];
+		const result = elideToolResults(messages, {
+			anchorToTurn: true,
+			budgetTokens: 100,
+			keepRecent: 0,
+		});
+		assert.strictEqual(result.elided, 0, "current-turn results must stay intact regardless of budget");
+		assert.deepStrictEqual(result.messages, messages);
+	});
+
+	it("elides previous-turn results down to the budget", () => {
+		const messages = [
+			userText("old task"),
+			toolResult(payload(40_000)),
+			toolResult(payload(40_000)),
+			toolResult("small old"),
+			assistantText("ok"),
+			userText("new task"),
+			toolResult(payload(40_000)),
+		];
+		const result = elideToolResults(messages, {
+			anchorToTurn: true,
+			budgetTokens: 1000,
+			keepRecent: 1,
+		});
+		assert.ok(result.elided >= 2, "old big results must be elided");
+		assert.deepStrictEqual(result.messages[6], messages[6], "current-turn result must survive");
+		assert.deepStrictEqual(result.messages[5], messages[5], "the user message must survive");
+		const stubbed = String((result.messages[1]!.content as { text: string }[])[0]!.text);
+		assert.match(stubbed, /read result elided/);
+	});
+
+	it("keeps the elision set stable as the current turn grows (cache-stable prefix)", () => {
+		const turnStart = [
+			userText("old task"),
+			toolResult(payload(40_000)),
+			toolResult(payload(40_000)),
+			assistantText("done"),
+			userText("new task"),
+		];
+		const withOneCall = [...turnStart, toolResult(payload(10_000))];
+		const withTwoCalls = [...withOneCall, assistantText("thinking"), toolResult(payload(10_000))];
+		// Keep the previous-turn results under the hard cap so mid-turn results stay protected.
+		const options = { anchorToTurn: true, budgetTokens: 100, turnHardCapTokens: 100_000, keepRecent: 0 };
+
+		const first = elideToolResults(withOneCall, options);
+		const second = elideToolResults(withTwoCalls, options);
+
+		// The prefix up to the turn boundary must be byte-identical across requests within the turn.
+		assert.deepStrictEqual(
+			second.messages.slice(0, 5),
+			first.messages.slice(0, 5),
+			"the elided prefix must not change while the turn grows",
+		);
+		assert.strictEqual(first.messages.length, withOneCall.length);
+		// And the new results are untouched.
+		assert.deepStrictEqual(second.messages[5], withOneCall[5]);
+		assert.deepStrictEqual(second.messages[7], withTwoCalls[7]);
+	});
+
+	it("overflows into current turn only past the hard cap", () => {
+		const messages = [
+			userText("old task"),
+			...Array.from({ length: 10 }, () => toolResult(payload(40_000))),
+			assistantText("done"),
+			userText("new task"),
+			toolResult(payload(40_000)),
+		];
+		const result = elideToolResults(messages, {
+			anchorToTurn: true,
+			budgetTokens: 1000,
+			turnHardCapTokens: 1000,
+			keepRecent: 1,
+		});
+		assert.deepStrictEqual(result.messages[13], messages[13], "the newest current-turn result must survive");
+		assert.ok(result.elided >= 10, "previous-turn results must be elided first");
+	});
+
+	it("falls back to sliding when no user message exists", () => {
+		const messages = Array.from({ length: 6 }, () => toolResult(payload(40_000)));
+		const result = elideToolResults(messages, { anchorToTurn: true, budgetTokens: 100, keepRecent: 2 });
+		assert.strictEqual(result.elided, 4, "without a turn boundary the sliding window applies");
+	});
+
+	it("stubs are still never rewritten (idempotent)", () => {
+		const messages = [userText("old"), toolResult(payload(40_000)), userText("new"), toolResult("small")];
+		const options = { anchorToTurn: true, budgetTokens: 100, keepRecent: 0 };
+		const once = elideToolResults(messages, options);
+		const twice = elideToolResults(once.messages, options);
+		assert.strictEqual(twice.elided, 0);
+		assert.deepStrictEqual(twice.messages, once.messages);
 	});
 });

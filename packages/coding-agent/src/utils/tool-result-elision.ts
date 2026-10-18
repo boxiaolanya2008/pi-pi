@@ -34,6 +34,22 @@ export interface ElisionOptions {
 	keepRecent?: number;
 	/** Tool results may use this many tokens before any of them is elided. */
 	budgetTokens?: number;
+	/**
+	 * Anchor elision at the last user message (turn boundary) instead of a sliding "newest N" window.
+	 *
+	 * A sliding window rewrites the prefix on every new tool result — the result that just left the
+	 * window is stubbed, invalidating every later byte of the request and forcing a full cache re-send.
+	 * Turn-anchored elision only changes the prefix once per user turn, so the request prefix is stable
+	 * for the whole turn and prompt-cache hits are preserved. Mid-turn results stay intact (bounded by
+	 * `turnHardCapTokens`), which is safe: they are the model's current working set.
+	 */
+	anchorToTurn?: boolean;
+	/**
+	 * Hard cap on current-turn tool-result tokens before mid-turn elision kicks in (only in turn-anchored
+	 * mode). Default: 2 × budgetTokens. A turn with 20 large reads would otherwise blow up the request
+	 * before the next turn boundary.
+	 */
+	turnHardCapTokens?: number;
 }
 
 export interface ElisionResult<T extends ElidableMessage> {
@@ -46,6 +62,14 @@ export interface ElisionResult<T extends ElidableMessage> {
 
 const DEFAULT_KEEP_RECENT = 8;
 const DEFAULT_BUDGET_TOKENS = 20_000;
+const DEFAULT_TURN_HARD_CAP_MULTIPLIER = 2;
+
+/**
+ * Results whose stub would not shrink them are kept by the main loop, but they still count against the
+ * budget. If every candidate is tiny, the loop exhausts them without meeting the budget — correct, but
+ * candidates must then be filtered to the ones that can actually shrink, or a long prefix of stubs gets
+ * re-examined every request for nothing. This set is derived per call from message shape, not cached.
+ */
 
 /** Rough token estimate matching the repository's own convention. */
 function estimateTokens(chars: number): number {
@@ -82,10 +106,60 @@ function stubFor(message: ElidableMessage, chars: number): string {
 }
 
 /**
+ * Find the indices of tool results eligible for elision in turn-anchored mode.
+ *
+ * Candidates are results before the last user message (previous turns), minus the newest `keepRecent`
+ * of those so the immediately-prior turn's context is preserved. If previous-turn results alone exceed
+ * the budget (a very long turn), current-turn results become candidates from the oldest, except the
+ * newest `keepRecent` — a last-resort overflow that trades one cache miss for request-size sanity.
+ */
+function turnAnchoredCandidates<T extends ElidableMessage>(
+	messages: readonly T[],
+	resultIndices: readonly number[],
+	options: ElisionOptions,
+	budget: number,
+): number[] {
+	const keepRecent = options.keepRecent ?? DEFAULT_KEEP_RECENT;
+	const turnHardCap = options.turnHardCapTokens ?? budget * DEFAULT_TURN_HARD_CAP_MULTIPLIER;
+
+	let lastUser = -1;
+	for (let index = messages.length - 1; index >= 0; index--) {
+		if (messages[index]!.role === "user") {
+			lastUser = index;
+			break;
+		}
+	}
+
+	// No user message: fall back to the sliding window rather than eliding everything.
+	if (lastUser < 0) {
+		return resultIndices.slice(0, Math.max(0, resultIndices.length - keepRecent));
+	}
+
+	const previousTurn = resultIndices.filter((index) => index < lastUser);
+	const currentTurn = resultIndices.filter((index) => index > lastUser);
+	const previousTurnChars = previousTurn.reduce((total, index) => total + sizeOf(messages[index]!), 0);
+
+	// Previous-turn results fit the cap: nothing before the turn boundary may change, so the request
+	// prefix is byte-stable for the whole turn and prompt-cache hits survive.
+	if (previousTurnChars <= turnHardCap) {
+		return previousTurn.slice(0, Math.max(0, previousTurn.length - keepRecent));
+	}
+
+	// A single turn blew past the hard cap (many large reads): let current-turn results join as
+	// candidates too, but never the newest `keepRecent` — the model is probably still using those.
+	return [...previousTurn, ...currentTurn.slice(0, Math.max(0, currentTurn.length - keepRecent))];
+}
+
+/**
  * Replace the oldest tool results with stubs until the budget is met.
  *
  * Recent results and small results are kept: eliding a short result saves little and costs the model
  * information it may be relying on.
+ *
+ * With `anchorToTurn`, elision is anchored at the last user message: results from previous turns are
+ * elided down to the budget, current-turn results are kept intact (unless they alone exceed
+ * `turnHardCapTokens`). The elision set only changes when a new user message arrives — once per turn
+ * instead of once per tool call — so the prompt-cache prefix stays byte-stable within a turn.
  */
 export function elideToolResults<T extends ElidableMessage>(
 	messages: readonly T[],
@@ -103,7 +177,11 @@ export function elideToolResults<T extends ElidableMessage>(
 	const unchanged: ElisionResult<T> = { messages: [...messages], elided: 0, savedChars: 0 };
 	if (estimateTokens(totalChars) <= budget) return unchanged;
 
-	const candidates = resultIndices.slice(0, Math.max(0, resultIndices.length - keepRecent));
+	// Turn-anchored: candidates are only results before the last user message; mid-turn results are
+	// protected so the prefix does not change between user turns.
+	const candidates = options.anchorToTurn
+		? turnAnchoredCandidates(messages, resultIndices, options, budget)
+		: resultIndices.slice(0, Math.max(0, resultIndices.length - keepRecent));
 	const next = [...messages];
 	let elided = 0;
 	let savedChars = 0;

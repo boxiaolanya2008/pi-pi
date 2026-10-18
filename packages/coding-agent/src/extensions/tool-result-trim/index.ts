@@ -5,13 +5,20 @@
  * bill long after the model has stopped needing them, and the tool can always be run again. The session
  * keeps every entry, so the transcript, `/rewind`, and export are unaffected; only the request is shaped.
  *
- * This costs one prefix cache miss per result at the moment it is first elided. A stub is deterministic,
- * so the prefix is stable again afterwards, and a result resent forever is worth one miss.
+ * Elision is anchored at the last user message (turn boundary): previous-turn results are trimmed to the
+ * budget once per turn, current-turn results stay intact. The old sliding "newest N" window rewrote the
+ * prefix on every new tool result, forcing a cache re-send of everything after it; anchoring trades one
+ * prefix rewrite per user turn for a byte-stable prefix within the turn. A stub is deterministic, so the
+ * prefix is stable again afterwards.
  *
  * Configuration, because `ExtensionContext` exposes no settings handle:
  * - `PI_TOOL_RESULT_TRIM=off` disables it.
  * - `PI_TOOL_RESULT_KEEP` is how many of the newest results stay intact (default 8).
  * - `PI_TOOL_RESULT_BUDGET` is the token budget for all results together (default 20000).
+ * - `PI_TOOL_RESULT_TRIM_MODE=sliding` restores the sliding-window behavior (more mid-turn memory,
+ *   one cache miss per elided result).
+ * - `PI_TOOL_RESULT_TURN_HARD_CAP` is the token cap for current-turn results before overflow elision
+ *   (default: 2 × budget).
  */
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
@@ -36,9 +43,14 @@ export default function toolResultTrimExtension(pi: ExtensionAPI): void {
 	pi.on("context", async (event, ctx) => {
 		if (!isEnabled()) return undefined;
 		try {
+			const mode = process.env.PI_TOOL_RESULT_TRIM_MODE?.trim().toLowerCase();
 			const result = elideToolResults(event.messages as AgentMessage[], {
 				keepRecent: readNumber("PI_TOOL_RESULT_KEEP"),
 				budgetTokens: readNumber("PI_TOOL_RESULT_BUDGET"),
+				// Anchored at the last user message by default: the sliding window rewrote the
+				// prefix on every tool call, which is a cache miss each time.
+				anchorToTurn: mode !== "sliding",
+				turnHardCapTokens: readNumber("PI_TOOL_RESULT_TURN_HARD_CAP"),
 			});
 			if (result.elided === 0) return undefined;
 
