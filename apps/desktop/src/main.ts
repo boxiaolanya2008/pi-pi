@@ -307,6 +307,16 @@ function registerIpc(): void {
 		if (!(data instanceof Uint8Array) || typeof mimeType !== "string") {
 			throw new Error("Expected image bytes and a mime type.");
 		}
+		// Storing an image the active model cannot read only defers the failure, so say so now.
+		if (session?.model && !session.model.input.includes("image")) {
+			const name = `${session.model.provider}/${session.model.id}`;
+			send({
+				id: randomUUID(),
+				kind: "notify",
+				level: "warning",
+				message: `${name} does not accept images. Switch to a vision model, or the image will be sent as a path only.`,
+			});
+		}
 		const directory = join(getAgentDir(), "pastes");
 		mkdirSync(directory, { recursive: true });
 		const path = join(directory, `paste-${randomUUID()}${extname(`x${mimeTypeToExtension(mimeType)}`) || ".png"}`);
