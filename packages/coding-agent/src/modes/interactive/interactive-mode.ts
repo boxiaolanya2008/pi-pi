@@ -69,6 +69,7 @@ import {
 	getAuthPath,
 	getDebugLogPath,
 	getDocsPath,
+	getModelsPath,
 	VERSION,
 } from "../../config.ts";
 import { type AgentSession, type AgentSessionEvent, parseSkillBlock } from "../../core/agent-session.ts";
@@ -109,6 +110,7 @@ import {
 	resolveModelScopeFromModels,
 } from "../../core/model-resolver.ts";
 import { CredentialSynchronizationError } from "../../core/model-runtime.ts";
+import { CUSTOM_PROVIDER_ID, upsertCustomProvider } from "../../core/models-json-write.ts";
 import { DefaultPackageManager } from "../../core/package-manager.ts";
 import { RADIUS_MCP_URL, RADIUS_PROVIDER_ID } from "../../core/radius.ts";
 import type { ResourceDiagnostic } from "../../core/resource-loader.ts";
@@ -134,6 +136,7 @@ import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipb
 import { parseGitUrl } from "../../utils/git.ts";
 import { extractImagePaths, loadImageAttachments } from "../../utils/image-attachments.ts";
 import { ensurePngTranscoder } from "../../utils/image-convert.ts";
+import { fetchModelList } from "../../utils/model-list-fetch.ts";
 import { getCwdRelativePath } from "../../utils/paths.ts";
 import { getPiUserAgent } from "../../utils/pi-user-agent.ts";
 import { killTrackedDetachedChildren } from "../../utils/shell.ts";
@@ -156,6 +159,7 @@ import { playArmin3d, playPiLogo3d } from "./components/easter-egg-3d.lazy.ts";
 import { ExtensionEditorComponent } from "./components/extension-editor.ts";
 import { ExtensionInputComponent } from "./components/extension-input.ts";
 import { ExtensionSelectorComponent } from "./components/extension-selector.ts";
+import { API_TYPE_OPTIONS } from "./components/first-time-setup.ts";
 import { FooterComponent, formatTokens } from "./components/footer.ts";
 import { formatKeyText, keyDisplayText, keyHint, keyText, rawKeyHint } from "./components/keybinding-hints.ts";
 import { LoginDialogComponent } from "./components/login-dialog.ts";
@@ -3437,6 +3441,17 @@ export class InteractiveMode {
 		const { text: remaining, paths } = extractImagePaths(text, this.sessionManager.getCwd());
 		if (paths.length === 0) return { text, images: [] };
 
+		// Not every model takes images. Sending one anyway either errors at the provider or comes back as
+		// an answer to text the model never saw, and neither says why. The `read` tool already checks
+		// this; user-attached images did not, which is what made it look like uploading was unsupported.
+		if (this.session.model && !this.session.model.input.includes("image")) {
+			this.showWarning(
+				`${this.session.model.provider}/${this.session.model.id} does not accept images. ` +
+					"Switch to a vision model (see /model) or the image will be sent as a file path only.",
+			);
+			return { text, images: [] };
+		}
+
 		try {
 			const { images, failures } = await loadImageAttachments(paths, {
 				autoResizeImages: this.settingsManager.getImageAutoResize(),
@@ -5866,6 +5881,8 @@ export class InteractiveMode {
 	private getLoginProviderOptions(authType?: "oauth" | "api_key"): AuthSelectorProvider[] {
 		const options: AuthSelectorProvider[] = [];
 		for (const provider of this.session.modelRuntime.getProviders()) {
+			// The custom endpoint gets its own entry below; its composed provider has a different name.
+			if (provider.id === CUSTOM_PROVIDER_ID) continue;
 			const authStatus = this.session.modelRuntime.getProviderAuthStatus(provider.id);
 			const status = authStatus.configured
 				? {
@@ -5894,6 +5911,17 @@ export class InteractiveMode {
 					subscription,
 				});
 			}
+		}
+		if (!authType || authType === "api_key") {
+			const customStatus = this.session.modelRuntime.getProviderAuthStatus(CUSTOM_PROVIDER_ID);
+			options.push({
+				id: CUSTOM_PROVIDER_ID,
+				name: "Custom API endpoint",
+				authType: "api_key",
+				status: customStatus.configured
+					? { type: "api_key" as const, source: customStatus.label ?? customStatus.source }
+					: undefined,
+			});
 		}
 		return options.sort((a, b) => a.name.localeCompare(b.name));
 	}
@@ -5951,13 +5979,161 @@ export class InteractiveMode {
 
 	/** `onBack` reopens the selector the login was started from when the user cancels it. */
 	private async startProviderLogin(providerOption: AuthSelectorProvider, onBack?: () => void): Promise<void> {
-		if (providerOption.authType === "oauth") {
+		if (providerOption.id === CUSTOM_PROVIDER_ID) {
+			await this.startCustomApiLogin(onBack);
+		} else if (providerOption.authType === "oauth") {
 			await this.showLoginDialog(providerOption.id, providerOption.name, onBack);
 		} else if (providerOption.method?.login) {
 			await this.showApiKeyLoginDialog(providerOption.id, providerOption.name, onBack);
 		} else {
 			this.showAmbientAuthDialog(providerOption, onBack);
 		}
+	}
+
+	/** Ask one text question, re-asking until the value validates or the user cancels. */
+	private async askCustomApiQuestion(
+		title: string,
+		placeholder: string,
+		validate: (value: string) => string | undefined,
+	): Promise<string | undefined> {
+		for (;;) {
+			const value = await this.showExtensionInput(title, placeholder);
+			if (value === undefined) return undefined;
+			const trimmed = value.trim();
+			const error = validate(trimmed);
+			if (!error) return trimmed;
+			this.showError(error);
+		}
+	}
+
+	/**
+	 * Custom endpoint setup: base URL and API key, then the model list is fetched
+	 * from the endpoint and saved to models.json under the `custom` provider.
+	 * When the endpoint exposes no model list, the user enters one model id instead.
+	 */
+	private async startCustomApiLogin(onBack?: () => void): Promise<void> {
+		const baseUrl = await this.askCustomApiQuestion("Custom API base URL", "https://api.example.com/v1", (value) =>
+			/^https?:\/\/\S+$/i.test(value) ? undefined : "Base URL must start with http:// or https://",
+		);
+		if (baseUrl === undefined) {
+			onBack?.();
+			return;
+		}
+		const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+
+		const api = await new Promise<string | undefined>((resolve) => {
+			this.showSelector((done) => {
+				const selector = new ExtensionSelectorComponent(
+					"What does the endpoint speak?",
+					API_TYPE_OPTIONS.map((option) => option.label),
+					(label) => {
+						done();
+						resolve(API_TYPE_OPTIONS.find((option) => option.label === label)?.value);
+					},
+					() => {
+						done();
+						resolve(undefined);
+					},
+				);
+				return { component: selector, focus: selector, dispose: () => selector.dispose() };
+			});
+		});
+		if (api === undefined) {
+			onBack?.();
+			return;
+		}
+
+		const apiKey = await this.askCustomApiQuestion(
+			"API key (any placeholder works for local endpoints)",
+			"sk-...",
+			(value) => (value ? undefined : "API key is required"),
+		);
+		if (apiKey === undefined) {
+			onBack?.();
+			return;
+		}
+
+		this.showStatus(`Fetching models from ${normalizedBaseUrl}...`);
+		let modelIds: string[] = [];
+		let fetchFailure: string | undefined;
+		try {
+			modelIds = await fetchModelList(normalizedBaseUrl, api, apiKey);
+		} catch (error) {
+			fetchFailure = error instanceof Error ? error.message : String(error);
+		}
+		if (modelIds.length === 0) {
+			const reason = fetchFailure ? ` (${fetchFailure})` : "";
+			const manual = await this.askCustomApiQuestion(
+				`The endpoint listed no models${reason}. Enter the model ID`,
+				"e.g. deepseek-chat",
+				(value) => (value ? undefined : "Model ID is required"),
+			);
+			if (manual === undefined) {
+				onBack?.();
+				return;
+			}
+			modelIds = [manual];
+		}
+
+		const modelId = modelIds[0]!;
+		let providerName: string | undefined;
+		try {
+			providerName = new URL(normalizedBaseUrl).hostname;
+		} catch {
+			// Keep the default provider name for malformed URLs.
+		}
+
+		try {
+			upsertCustomProvider(getModelsPath(), {
+				providerId: CUSTOM_PROVIDER_ID,
+				name: providerName,
+				baseUrl: normalizedBaseUrl,
+				api,
+				apiKey,
+				modelId,
+				modelIds,
+			});
+		} catch (error) {
+			this.showError(
+				`Could not save the custom endpoint: ${error instanceof Error ? error.message : String(error)}`,
+			);
+			return;
+		}
+
+		try {
+			await this.session.modelRuntime.refresh({
+				providers: [CUSTOM_PROVIDER_ID],
+				signal: AbortSignal.timeout(15_000),
+			});
+		} catch (error) {
+			this.showWarning(
+				`Custom endpoint saved, but its models could not be loaded: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+
+		const loaded = this.session.modelRuntime
+			.getAvailableSnapshot()
+			.filter((model) => model.provider === CUSTOM_PROVIDER_ID);
+		const selected = loaded.find((model) => model.id === modelId) ?? loaded[0];
+		try {
+			if (selected) {
+				await this.session.setModel(selected, { persist: true });
+				this.showStatus(
+					`Custom endpoint configured. Loaded ${loaded.length} model${loaded.length === 1 ? "" : "s"}. ` +
+						`Selected ${selected.id}. Use /model to pick another.`,
+				);
+			} else {
+				this.showStatus(
+					`Custom endpoint configured. ${modelIds.length} model${modelIds.length === 1 ? "" : "s"} saved to ${getModelsPath()}. Use /model to select one.`,
+				);
+			}
+		} catch (error) {
+			this.showWarning(
+				`Custom endpoint configured, but selecting ${modelId} failed: ${error instanceof Error ? error.message : String(error)}. Use /model to select a model.`,
+			);
+		}
+		this.updateAvailableProviderCount();
+		this.footer.invalidate();
 	}
 
 	private showLoginAuthTypeSelector(providerOptions?: AuthSelectorProvider[]): void {
@@ -5972,6 +6148,7 @@ export class InteractiveMode {
 			oauthProvider?.method && "loginLabel" in oauthProvider.method ? oauthProvider.method.loginLabel : undefined;
 		const subscriptionLabel = oauthLoginLabel ?? "Sign in with an account";
 		const apiKeyLabel = "Sign in with an API key";
+		const customApiLabel = "Configure a custom API endpoint (base URL + key)";
 		const availableAuthTypes = providerOptions
 			? new Set(providerOptions.map((provider) => provider.authType))
 			: new Set<AuthSelectorProvider["authType"]>(["oauth", "api_key"]);
@@ -5982,6 +6159,7 @@ export class InteractiveMode {
 		if (availableAuthTypes.has("api_key")) {
 			options.push(apiKeyLabel);
 		}
+		if (!providerOptions) options.push(customApiLabel);
 		if (radiusLabel) options.push(radiusLabel);
 
 		if (options.length === 0) {
@@ -6005,6 +6183,10 @@ export class InteractiveMode {
 				done();
 				if (radiusOption && option === radiusLabel) {
 					void this.startProviderLogin(radiusOption, () => this.showLoginAuthTypeSelector());
+					return;
+				}
+				if (option === customApiLabel) {
+					void this.startCustomApiLogin(() => this.showLoginAuthTypeSelector());
 					return;
 				}
 				const authType = option === subscriptionLabel ? "oauth" : "api_key";

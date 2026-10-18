@@ -39,7 +39,7 @@ const ANALYTICS_OPTIONS: Array<{ value: boolean; label: string }> = [
 
 const MODEL_CHOICE_OPTIONS = ["Configure a custom model (API / Model / Key)", "Skip"];
 
-const API_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+export const API_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
 	{ value: "openai-completions", label: "OpenAI-compatible (chat completions)" },
 	{ value: "openai-responses", label: "OpenAI Responses API" },
 	{ value: "anthropic-messages", label: "Anthropic-compatible" },

@@ -17,6 +17,18 @@ Run `/logout` and select a provider to remove its stored credential. This does n
 
 `auth.json` can contain API keys and OAuth tokens. Keep it private and do not commit it.
 
+## Configure a custom API endpoint
+
+For a provider Pi does not know about, run `/login` and choose **Configure a custom API endpoint (base URL + key)**, or run `/login custom`. Pi asks for:
+
+1. The API base URL, for example `https://api.example.com/v1`.
+2. The API type the endpoint speaks: OpenAI-compatible, OpenAI Responses, Anthropic-compatible, or Google Gemini-compatible.
+3. The API key (any placeholder works for local endpoints).
+
+Pi then fetches the model list from the endpoint (`GET {baseUrl}/models`, falling back to `{baseUrl}/v1/models`) and saves everything to `models.json` under the `custom` provider. The first model is selected right away; use `/model` to pick another. When the endpoint exposes no model list, Pi asks for a single model ID instead.
+
+See [`models.json`](models.md#custom-compatible-endpoints) for the underlying configuration format.
+
 ## Use an API key from the environment
 
 Environment variables are useful in CI and anywhere Pi should not store the key. Set the variable before starting Pi:

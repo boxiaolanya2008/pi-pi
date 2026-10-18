@@ -59,6 +59,8 @@ describe("OAuthSelectorComponent", () => {
 				authType: "api_key",
 				method: { name: "Anthropic API key" },
 			},
+			// The custom API endpoint option is always offered for api_key logins, alphabetically sorted by name.
+			{ id: "custom", name: "Custom API endpoint", authType: "api_key" },
 			{
 				id: "google-vertex",
 				name: "Google Vertex AI",
@@ -66,6 +68,8 @@ describe("OAuthSelectorComponent", () => {
 				method: { name: "Google Cloud credentials" },
 			},
 		]);
+		// Never duplicated even when models.json already configures a "custom" provider (the loop skips it).
+		expect(apiKeyOptions.filter((option) => option.id === "custom")).toHaveLength(1);
 		expect(getLoginProviderOptions.call(fakeThis, "oauth")).toMatchObject([
 			{ id: "anthropic", name: "Anthropic", authType: "oauth" },
 		]);

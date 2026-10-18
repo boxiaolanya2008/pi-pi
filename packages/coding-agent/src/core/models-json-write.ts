@@ -18,6 +18,10 @@ export interface CustomModelConfig {
 	api: string;
 	apiKey?: string;
 	modelId: string;
+	/** When set, replaces the provider's model list entirely (e.g. a model list fetched from the endpoint). */
+	modelIds?: string[];
+	/** Display name shown in pickers. Unset keeps the previous value, if any. */
+	name?: string;
 }
 
 /**
@@ -34,13 +38,16 @@ export function upsertCustomProvider(modelsPath: string, config: CustomModelConf
 
 	const providers = parsed.providers ?? {};
 	const existing = providers[config.providerId];
-	const model = { id: config.modelId };
+	const models = config.modelIds?.length
+		? config.modelIds.map((id) => ({ id }))
+		: [...(existing?.models ?? []).filter((m) => m.id !== config.modelId), { id: config.modelId }];
 	const provider: ModelsJsonProvider = {
 		...existing,
+		...(config.name ? { name: config.name } : {}),
 		baseUrl: config.baseUrl,
 		api: config.api,
 		...(config.apiKey ? { apiKey: config.apiKey } : {}),
-		models: [...(existing?.models ?? []).filter((m) => m.id !== config.modelId), model],
+		models,
 	};
 	providers[config.providerId] = provider;
 	parsed.providers = providers;
