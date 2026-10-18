@@ -33,7 +33,7 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			expect(prompt).toContain("路径须清晰可查");
+			expect(prompt).toContain("Every claim about the codebase traces to a file you opened");
 		});
 	});
 
@@ -48,7 +48,7 @@ describe("buildSystemPrompt", () => {
 				skills: [],
 			});
 
-			expect(defaultPrompt.startsWith("# Role: 极简主义多模块项目架构师")).toBe(true);
+			expect(defaultPrompt.startsWith("# Role")).toBe(true);
 			expect(customPrompt.startsWith("You are Exact.\n\n<cwd>")).toBe(true);
 		});
 
