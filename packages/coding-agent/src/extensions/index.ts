@@ -4,6 +4,7 @@ import expertTeamExtension from "./expert-team/index.ts";
 import llamaExtension from "./llama/index.ts";
 import mcpExtension from "./mcp/index.ts";
 import messageTrimExtension from "./message-trim/index.ts";
+import modesExtension from "./modes/index.ts";
 import planExtension from "./plan/index.ts";
 import reverieExtension from "./reverie/index.ts";
 import rewindExtension from "./rewind/index.ts";
@@ -17,6 +18,7 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "plan", factory: planExtension, builtin: true },
 	{ name: "rewind", factory: rewindExtension, builtin: true },
 	{ name: "reverie", factory: reverieExtension, builtin: true },
+	{ name: "modes", factory: modesExtension, builtin: true },
 	// Runs first among the built-ins it can affect: the guard blocks before any tool executes.
 	{ name: "workspace-guard", factory: workspaceGuardExtension, builtin: true },
 	{ name: "message-trim", factory: messageTrimExtension, builtin: true },

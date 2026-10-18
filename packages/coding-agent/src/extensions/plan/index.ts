@@ -18,6 +18,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
+import { createPlanModeController } from "../../core/modes.ts";
 import { PLAN_DIR } from "../storage-paths.ts";
 import { savePlanDoc } from "./plan-doc.ts";
 import { PlanLineEditor, TodoListComponent } from "./viewer.ts";
@@ -42,8 +43,6 @@ const TodoParams = Type.Object({
 });
 
 const TODO_ENTRY_TYPE = "plan-todos";
-const PLAN_MODE_ENTRY_TYPE = "plan-mode";
-const PLAN_READONLY_TOOLS = ["read", "bash", "grep", "find", "ls"];
 
 const PLAN_MODE_ENTER_GUIDANCE = `You are now in plan mode: write tools are disabled so nothing can be modified.
 1. Explore the relevant code read-only until you understand the change.
@@ -79,52 +78,22 @@ export default function planExtension(pi: ExtensionAPI): void {
 		}
 	};
 
+	// Plan mode lives in a shared controller so `/plan`, the `plan_mode` tool, and the mode cycle cannot
+	// disagree about whether write access is available. All three get the same instance for this `pi`.
+	const planMode = createPlanModeController(pi);
+	const planModeEnabled = (): boolean => planMode.isEnabled();
+
 	/** Re-apply plan mode from the last persisted mode entry (resume/branch switch). */
 	const restorePlanMode = (ctx: ExtensionContext) => {
-		let enabled = false;
-		let tools: string[] | undefined;
-		for (const entry of ctx.sessionManager.getBranch()) {
-			if (entry.type !== "custom" || (entry as { customType?: string }).customType !== PLAN_MODE_ENTRY_TYPE)
-				continue;
-			const data = (entry as { data?: { enabled?: boolean; toolsBeforePlanMode?: string[] } }).data;
-			enabled = data?.enabled ?? false;
-			tools = data?.toolsBeforePlanMode;
-		}
-		if (enabled && !planModeEnabled) {
-			toolsBeforePlanMode = tools;
-			const active = new Set((tools ?? pi.getActiveTools()).filter((name) => name !== "edit" && name !== "write"));
-			for (const name of PLAN_READONLY_TOOLS) active.add(name);
-			active.add("save_plan");
-			pi.setActiveTools([...active]);
-			planModeEnabled = true;
-			ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("warning", "plan"));
-		} else if (!enabled && planModeEnabled) {
-			exitPlanMode(ctx);
-		}
+		planMode.restore(ctx);
 	};
 
-	let planModeEnabled = false;
-	let toolsBeforePlanMode: string[] | undefined;
-
 	function enterPlanMode(ctx: ExtensionContext): void {
-		if (planModeEnabled) return;
-		toolsBeforePlanMode = pi.getActiveTools();
-		const active = new Set(toolsBeforePlanMode.filter((name) => name !== "edit" && name !== "write"));
-		for (const name of PLAN_READONLY_TOOLS) active.add(name);
-		active.add("save_plan");
-		pi.setActiveTools([...active]);
-		planModeEnabled = true;
-		pi.appendEntry(PLAN_MODE_ENTRY_TYPE, { enabled: true, toolsBeforePlanMode });
-		ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("warning", "plan"));
+		planMode.enter(ctx);
 	}
 
 	function exitPlanMode(ctx: ExtensionContext): void {
-		if (!planModeEnabled) return;
-		pi.setActiveTools(toolsBeforePlanMode ?? pi.getActiveTools());
-		toolsBeforePlanMode = undefined;
-		planModeEnabled = false;
-		pi.appendEntry(PLAN_MODE_ENTRY_TYPE, { enabled: false });
-		ctx.ui.setStatus("plan-mode", undefined);
+		planMode.exit(ctx);
 	}
 
 	function updateWidgets(ctx: ExtensionContext): void {
@@ -367,7 +336,7 @@ export default function planExtension(pi: ExtensionAPI): void {
 		handler: async (args, ctx) => {
 			const topic = args.trim();
 			if (!topic) {
-				if (planModeEnabled) exitPlanMode(ctx);
+				if (planModeEnabled()) exitPlanMode(ctx);
 				else enterPlanMode(ctx);
 				return;
 			}
